@@ -86,3 +86,9 @@ switch-db.sh
 
 # Claude Code internal files
 .claude/
+
+#无用文件
+new_scripts/
+flag01-03*
+scripts/
+靶机PrePrompt.txt

