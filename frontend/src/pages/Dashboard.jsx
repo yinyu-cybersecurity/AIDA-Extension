@@ -18,6 +18,7 @@ import apiClient from '../services/api';
 import { commandService } from '../services/commandService';
 import toolStatsService from '../services/toolStatsService';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Utility for smooth Bezier curves
 const getControlPoint = (current, previous, next, reverse) => {
@@ -71,6 +72,7 @@ const generateSmoothPath = (points, closePath) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { isOperator } = useTheme();
   const [assessments, setAssessments] = useState([]);
   const [allFindings, setAllFindings] = useState([]);
   const [allCommands, setAllCommands] = useState([]);
@@ -375,7 +377,10 @@ const Dashboard = () => {
           {lastActiveAssessment && (
             <Link
               to={`/assessments/${lastActiveAssessment.id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700 rounded-md transition-colors"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${isOperator
+                ? 'border border-slate-700 bg-slate-900/80 text-slate-300 hover:border-cyan-500/20 hover:bg-slate-800 hover:text-slate-100'
+                : 'text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+              }`}
             >
               <Play className="w-3.5 h-3.5" />
               Resume {lastActiveAssessment.name}
@@ -454,7 +459,7 @@ const Dashboard = () => {
       </div>
 
       {/* Commands Timeline (Full width) */}
-      <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6">
+      <div className={`border rounded-lg p-6 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Commands Timeline</h3>
@@ -465,7 +470,10 @@ const Dashboard = () => {
           <select
             value={timelinePeriod}
             onChange={(e) => setTimelinePeriod(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 dark:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className={`px-3 py-1.5 text-sm border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 ${isOperator
+            ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100 hover:bg-slate-900'
+            : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 dark:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+          }`}
           >
             <option value="30">Last 30 days</option>
             <option value="90">Last 3 months</option>
@@ -640,7 +648,7 @@ const Dashboard = () => {
                         transform: 'translateX(-50%)'
                       }}
                     >
-                      <div className="bg-neutral-800 dark:bg-neutral-700 text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap">
+                      <div className={`text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap ${isOperator ? 'bg-slate-800 text-slate-100' : 'bg-neutral-800 dark:bg-neutral-700 text-white'}`}>
                         <div className="font-medium mb-1">{formatTooltipDate(data.date)}</div>
                         <div className="flex items-center gap-3">
                           <span className="text-green-400">{data.success} success</span>
@@ -651,7 +659,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                       {/* Arrow */}
-                      <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-neutral-800 dark:bg-neutral-700 rotate-45"></div>
+                      <div className={`absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 rotate-45 ${isOperator ? 'bg-slate-800' : 'bg-neutral-800 dark:bg-neutral-700'}`}></div>
                     </div>
                   );
                 })()}
@@ -704,7 +712,7 @@ const Dashboard = () => {
       {/* Main Content Grid */}
       <div className="grid grid-cols-3 gap-6">
         {/* Left: Findings by Severity */}
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6">
+        <div className={`border rounded-lg p-6 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Findings by Severity</h3>
 
           {findingsBySeverity.total > 0 ? (
@@ -786,7 +794,7 @@ const Dashboard = () => {
         </div>
 
         {/* Center: Tool Usage */}
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6">
+        <div className={`border rounded-lg p-6 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Tool Usage</h3>
             <Link
@@ -835,7 +843,7 @@ const Dashboard = () => {
         </div>
 
         {/* Right: Assessment Status */}
-        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6">
+        <div className={`border rounded-lg p-6 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Assessment Status</h3>
 
           {assessmentDistribution.total > 0 ? (
@@ -892,7 +900,7 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Findings Table */}
-      <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-6">
+      <div className={`border rounded-lg p-6 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Recent Findings</h3>
           <Link to="/assessments" className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1">

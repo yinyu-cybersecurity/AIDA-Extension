@@ -19,8 +19,10 @@ import {
     listSourceCode,
     deleteSourceCode,
 } from '../../services/sourceCodeService';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const ContextDocumentsPanel = ({ assessmentId }) => {
+    const { isOperator } = useTheme();
     const [activeTab, setActiveTab] = useState('files');
 
     // Context files state
@@ -217,10 +219,10 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                 </div>
             )}
 
-            <div className="border border-neutral-200 dark:border-neutral-700 rounded overflow-hidden">
+            <div className={`border rounded overflow-hidden ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
 
                 {/* Tab bar */}
-                <div className="flex border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50">
+                <div className={`flex border-b ${isOperator ? 'border-cyan-500/20 bg-slate-950/60' : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50'}`}>
                     {[
                         { id: 'files', label: 'Files', Icon: Upload },
                         { id: 'git', label: 'Git Clone', Icon: GitBranch },
@@ -229,8 +231,8 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                             key={id}
                             onClick={() => setActiveTab(id)}
                             className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors ${activeTab === id
-                                ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-neutral-800'
-                                : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                                ? (isOperator ? 'border-cyan-400 text-cyan-300 bg-slate-950/80' : 'border-blue-500 text-blue-600 dark:text-blue-400 bg-white dark:bg-neutral-800')
+                                : (isOperator ? 'border-transparent text-slate-400 hover:text-cyan-200' : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200')
                                 }`}
                         >
                             <Icon className="w-3.5 h-3.5" />
@@ -247,9 +249,9 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                             onDragLeave={handleDrag}
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
-                            className={`border-b border-neutral-200 dark:border-neutral-700 p-4 text-center transition-colors ${dragActive
-                                ? 'bg-blue-50 dark:bg-blue-900/20'
-                                : 'bg-neutral-50/50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-700/50'
+                            className={`border-b p-4 text-center transition-colors ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'} ${dragActive
+                                ? (isOperator ? 'bg-cyan-900/20' : 'bg-blue-50 dark:bg-blue-900/20')
+                                : (isOperator ? 'bg-slate-950/40 hover:bg-slate-900/60' : 'bg-neutral-50/50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-700/50')
                                 }`}
                         >
                             <input
@@ -285,7 +287,7 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                                     {documents.map((doc) => (
                                         <tr
                                             key={doc.filename}
-                                            className="border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 hover:bg-neutral-50/50 dark:hover:bg-neutral-700/50"
+                                            className={`border-b last:border-b-0 ${isOperator ? 'border-cyan-500/10 hover:bg-cyan-500/5' : 'border-neutral-100 dark:border-neutral-700 hover:bg-neutral-50/50 dark:hover:bg-neutral-700/50'}`}
                                         >
                                             <td className="px-3 py-2">
                                                 <p className="font-mono text-neutral-900 dark:text-neutral-100">{doc.filename}</p>
@@ -314,7 +316,7 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
 
                 {/* ── Git Clone tab ──────────────────────────────────────────── */}
                 {activeTab === 'git' && (
-                    <div className="p-4 space-y-3 bg-white dark:bg-neutral-800">
+                    <div className={`p-4 space-y-3 ${isOperator ? 'bg-slate-950/40' : 'bg-white dark:bg-neutral-800'}`}>
                         {/* URL + branch detect */}
                         <div>
                             <label className="block text-xs font-medium text-neutral-600 dark:text-neutral-400 mb-1">
@@ -333,13 +335,19 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                                     }}
                                     onKeyDown={(e) => e.key === 'Enter' && handleDetectBranches()}
                                     placeholder="https://github.com/user/repo.git"
-                                    className="flex-1 px-3 py-1.5 text-xs font-mono bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    className={`flex-1 px-3 py-1.5 text-xs font-mono border rounded placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isOperator
+                                        ? 'bg-slate-950/60 border-cyan-500/20 text-slate-100 placeholder-slate-500'
+                                        : 'bg-neutral-50 dark:bg-neutral-700 border-neutral-200 dark:border-neutral-600 text-neutral-900 dark:text-neutral-100'
+                                    }`}
                                     disabled={cloning}
                                 />
                                 <button
                                     onClick={handleDetectBranches}
                                     disabled={!gitUrl.trim() || detectingBranches || cloning}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isOperator
+                                        ? 'border-cyan-500/20 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-cyan-200'
+                                        : 'text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-700 border-neutral-200 dark:border-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+                                    }`}
                                 >
                                     {detectingBranches
                                         ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -359,7 +367,10 @@ const ContextDocumentsPanel = ({ assessmentId }) => {
                                 <select
                                     value={selectedBranch}
                                     onChange={(e) => setSelectedBranch(e.target.value)}
-                                    className="w-full px-3 py-1.5 text-xs bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className={`w-full px-3 py-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${isOperator
+                                        ? 'bg-slate-950/60 border-cyan-500/20 text-slate-100'
+                                        : 'bg-neutral-50 dark:bg-neutral-700 border-neutral-200 dark:border-neutral-600 text-neutral-900 dark:text-neutral-100'
+                                    }`}
                                     disabled={cloning}
                                 >
                                     {branches.map((b) => <option key={b} value={b}>{b}</option>)}

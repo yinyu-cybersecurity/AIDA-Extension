@@ -4,6 +4,7 @@ import { MoreVertical, Calendar, User, Tag, Clock, Edit3 } from 'lucide-react';
 import AssessmentCardActions from './AssessmentCardActions';
 import StatusDropdown from './StatusDropdown';
 import apiClient from '../../services/api';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const AssessmentsTable = ({
   assessments = [],
@@ -13,6 +14,7 @@ const AssessmentsTable = ({
   onAssessmentEdit,
   loading = false
 }) => {
+  const { isOperator } = useTheme();
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
 
@@ -114,7 +116,7 @@ const AssessmentsTable = ({
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+      <div className={`border rounded-lg overflow-hidden ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           <span className="ml-3 text-neutral-600 dark:text-neutral-400">Updating...</span>
@@ -127,7 +129,7 @@ const AssessmentsTable = ({
     return (
       <div className="empty-state">
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 bg-neutral-100 dark:bg-neutral-700 rounded-full flex items-center justify-center">
+          <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${isOperator ? 'bg-slate-800' : 'bg-neutral-100 dark:bg-neutral-700'}`}>
             <Tag className="w-8 h-8 text-neutral-400 dark:text-neutral-500" />
           </div>
           <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">No assessments found</h3>
@@ -138,10 +140,10 @@ const AssessmentsTable = ({
   }
 
   return (
-    <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-neutral-50 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700">
+          <thead className={`border-b ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700'}`}>
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider w-1/4">
                 <button
@@ -198,9 +200,9 @@ const AssessmentsTable = ({
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-neutral-800 divide-y divide-neutral-200 dark:divide-neutral-700">
+          <tbody className={`divide-y ${isOperator ? 'divide-cyan-500/10' : 'bg-white dark:bg-neutral-800 divide-neutral-200 dark:divide-neutral-700'}`}>
             {sortedAssessments.map((assessment) => (
-              <tr key={assessment.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors group">
+              <tr key={assessment.id} className={`transition-colors group ${isOperator ? 'hover:bg-cyan-500/5' : 'hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <Link
                     to={`/assessments/${assessment.id}`}
@@ -258,7 +260,7 @@ const AssessmentsTable = ({
                         e.stopPropagation();
                         onAssessmentEdit(assessment);
                       }}
-                      className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      className={`p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${isOperator ? 'hover:bg-cyan-500/10' : 'hover:bg-neutral-100 dark:hover:bg-neutral-600'}`}
                       title="Edit assessment"
                     >
                       <Edit3 className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />

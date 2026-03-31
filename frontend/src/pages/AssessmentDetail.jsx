@@ -8,6 +8,7 @@ import EditableField from '../components/common/EditableField';
 import ReconTable from '../components/assessment/ReconTable';
 import PhaseSection from '../components/assessment/PhaseSection';
 import PhaseContentViewSimple from '../components/assessment/PhaseContentViewSimple';
+import { useTheme } from '../contexts/ThemeContext';
 import CardsTable from '../components/assessment/CardsTable';
 import CommandHistoryRefactored from '../components/assessment/CommandHistoryRefactored';
 import ImportScanModal from '../components/assessment/ImportScanModal';
@@ -41,6 +42,7 @@ const sortByScore = (a, b) => {
 
 const AssessmentDetail = () => {
   const { id } = useParams();
+  const { isOperator } = useTheme();
   const [assessment, setAssessment] = useState(null);
   const [reconData, setReconData] = useState([]);
   const [reconCategories, setReconCategories] = useState(['endpoint', 'subdomain', 'service', 'technology']);
@@ -455,17 +457,17 @@ const AssessmentDetail = () => {
 
       {/* Stats en ligne compactes */}
       <div className="grid grid-cols-6 gap-3 text-center">
-        <div className="bg-gray-50 dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
-          <div className="text-lg font-semibold text-gray-900 dark:text-neutral-100">{stats.totalCards}</div>
-          <div className="text-xs text-gray-500 dark:text-neutral-400">Cards</div>
+        <div className={`p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+          <div className={`text-lg font-semibold ${isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100'}`}>{stats.totalCards}</div>
+          <div className={`text-xs ${isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400'}`}>Cards</div>
         </div>
-        <div className="bg-gray-50 dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
-          <div className="text-lg font-semibold text-gray-900 dark:text-neutral-100">{stats.commands}</div>
-          <div className="text-xs text-gray-500 dark:text-neutral-400">Commands</div>
+        <div className={`p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+          <div className={`text-lg font-semibold ${isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100'}`}>{stats.commands}</div>
+          <div className={`text-xs ${isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400'}`}>Commands</div>
         </div>
-        <div className="bg-gray-50 dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
-          <div className="text-lg font-semibold text-gray-900 dark:text-neutral-100">{stats.recon}</div>
-          <div className="text-xs text-gray-500 dark:text-neutral-400">Recon</div>
+        <div className={`p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+          <div className={`text-lg font-semibold ${isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100'}`}>{stats.recon}</div>
+          <div className={`text-xs ${isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400'}`}>Recon</div>
         </div>
         <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded border border-red-200 dark:border-red-700">
           <div className="text-lg font-semibold text-red-600 dark:text-red-400">{stats.critical}</div>
@@ -482,9 +484,9 @@ const AssessmentDetail = () => {
       </div>
 
       {/* Assessment Settings - Déplacé en haut */}
-      <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-        <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-900">
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-neutral-100">Assessment Settings</h2>
+      <div className={`border rounded-lg ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+        <div className={`px-4 py-3 border-b ${isOperator ? 'border-cyan-500/20 bg-slate-950/60' : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900'}`}>
+          <h2 className={`text-sm font-semibold ${isOperator ? 'text-slate-100' : 'text-neutral-800 dark:text-neutral-100'}`}>Assessment Settings</h2>
         </div>
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -568,12 +570,15 @@ const AssessmentDetail = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-neutral-100">Reconnaissance & Findings Surface</h2>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">Switch between structured intel tables and a topology command surface.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-400/10 bg-slate-950/70 p-2 shadow-[0_0_0_1px_rgba(34,211,238,0.06),0_16px_36px_rgba(2,8,23,0.35)]">
+          <div className={`flex flex-wrap items-center gap-2 rounded-2xl border p-2 ${isOperator
+            ? 'border-cyan-400/10 bg-slate-950/70 shadow-[0_0_0_1px_rgba(34,211,238,0.06),0_16px_36px_rgba(2,8,23,0.35)]'
+            : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800'
+          }`}>
             <button
               onClick={() => setIntelSurfaceMode('intel')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition-all ${intelSurfaceMode === 'intel'
-                ? 'bg-cyan-400 text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.45)]'
-                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-cyan-200'
+                ? (isOperator ? 'bg-cyan-400 text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.45)]' : 'bg-primary-600 text-white shadow-sm')
+                : (isOperator ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-cyan-200' : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700')
                 }`}
               type="button"
             >
@@ -583,8 +588,8 @@ const AssessmentDetail = () => {
             <button
               onClick={() => setIntelSurfaceMode('view')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition-all ${intelSurfaceMode === 'view'
-                ? 'bg-emerald-400 text-slate-950 shadow-[0_0_24px_rgba(74,222,128,0.35)]'
-                : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-emerald-200'
+                ? (isOperator ? 'bg-emerald-400 text-slate-950 shadow-[0_0_24px_rgba(74,222,128,0.35)]' : 'bg-emerald-600 text-white shadow-sm')
+                : (isOperator ? 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-emerald-200' : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700')
                 }`}
               type="button"
             >
@@ -643,7 +648,7 @@ const AssessmentDetail = () => {
                 </div>
 
                 {/* Compact horizontal filter bar - Single row */}
-                <div className="flex flex-wrap items-center gap-2 mb-6 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-3">
+                <div className={`flex flex-wrap items-center gap-2 mb-6 border rounded-lg p-3 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
                   {/* Type filters */}
                   <button
                     onClick={() => setCardFilter('overview')}
@@ -909,11 +914,11 @@ const AssessmentDetail = () => {
       </div>
 
       {/* Command History - Version compacte et navigable */}
-      <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-        <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-900">
+      <div className={`border rounded-lg ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
+        <div className={`px-4 py-3 border-b ${isOperator ? 'border-cyan-500/20 bg-slate-950/60' : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900'}`}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-neutral-100">Command History</h2>
-            <span className="text-xs text-gray-500 dark:text-neutral-400">{commands.length} commands</span>
+            <h2 className={`text-sm font-semibold ${isOperator ? 'text-slate-100' : 'text-neutral-800 dark:text-neutral-100'}`}>Command History</h2>
+            <span className={`text-xs ${isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400'}`}>{commands.length} commands</span>
           </div>
         </div>
         <div className="p-4">

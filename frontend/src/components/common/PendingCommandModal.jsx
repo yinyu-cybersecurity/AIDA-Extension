@@ -3,8 +3,10 @@
  */
 import { useState } from 'react';
 import { approvePendingCommand, rejectPendingCommand } from '../../services/pendingCommandService';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) => {
+  const { isOperator } = useTheme();
   const [isProcessing, setIsProcessing] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -63,10 +65,13 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-neutral-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm ${isOperator ? 'bg-slate-950/72' : 'bg-black/50'}`}>
+      <div className={`rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto ${isOperator
+        ? 'border border-cyan-500/20 bg-[linear-gradient(180deg,rgba(8,15,36,0.96),rgba(2,6,23,0.92))] shadow-[0_28px_80px_rgba(2,6,23,0.7),0_0_0_1px_rgba(34,211,238,0.08)]'
+        : 'bg-white dark:bg-neutral-800'
+      }`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-neutral-700">
+        <div className={`flex items-center justify-between p-6 border-b ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
               <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,14 +79,14 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-neutral-100">Command Requires Validation</h2>
-              <p className="text-sm text-gray-500 dark:text-neutral-400">A potentially dangerous command needs your approval</p>
+              <h2 className={`text-xl font-semibold ${isOperator ? 'text-slate-50' : 'text-neutral-900 dark:text-neutral-100'}`}>Command Requires Validation</h2>
+              <p className={`text-sm ${isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400'}`}>A potentially dangerous command needs your approval</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors"
+            className={`transition-colors ${isOperator ? 'text-slate-500 hover:text-slate-200' : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'}`}
             disabled={isProcessing}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +123,7 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
                 )}
               </label>
               {pendingCommand.command_type === 'python' ? (
-                <pre className="bg-gray-900 dark:bg-black text-emerald-300 p-4 rounded-lg font-mono text-sm overflow-auto max-h-64 whitespace-pre-wrap">
+                <pre className={`${isOperator ? 'bg-[#020617] text-emerald-300' : 'bg-neutral-900 dark:bg-black text-emerald-300'} p-4 rounded-lg font-mono text-sm overflow-auto max-h-64 whitespace-pre-wrap`}>
                   {pendingCommand.command}
                 </pre>
               ) : pendingCommand.command_type === 'http' ? (
@@ -126,7 +131,7 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
                   try {
                     const req = JSON.parse(pendingCommand.command);
                     return (
-                      <div className="bg-gray-900 dark:bg-black rounded-lg overflow-hidden">
+                      <div className={`${isOperator ? 'bg-[#020617]' : 'bg-neutral-900 dark:bg-black'} rounded-lg overflow-hidden`}>
                         <div className="px-4 py-2 border-b border-neutral-700 font-mono text-sm">
                           <span className="text-blue-400 font-semibold">{req.method || 'GET'}</span>
                           {' '}
@@ -166,14 +171,14 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
                     );
                   } catch {
                     return (
-                      <div className="bg-gray-900 dark:bg-black text-blue-300 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                      <div className={`${isOperator ? 'bg-[#020617] text-blue-300' : 'bg-neutral-900 dark:bg-black text-blue-300'} p-4 rounded-lg font-mono text-sm overflow-x-auto`}>
                         {pendingCommand.command}
                       </div>
                     );
                   }
                 })()
               ) : (
-                <div className="bg-gray-900 dark:bg-black text-gray-100 dark:text-neutral-200 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                <div className={`${isOperator ? 'bg-[#020617] text-slate-200' : 'bg-neutral-900 dark:bg-black text-neutral-100 dark:text-neutral-200'} p-4 rounded-lg font-mono text-sm overflow-x-auto`}>
                   {pendingCommand.command}
                 </div>
               )}
@@ -181,14 +186,14 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-1">Assessment ID</label>
-                <p className="text-sm text-gray-900 dark:text-neutral-100">#{pendingCommand.assessment_id}</p>
+                <label className={`block text-sm font-medium mb-1 ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>Assessment ID</label>
+                <p className={`text-sm ${isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100'}`}>#{pendingCommand.assessment_id}</p>
               </div>
 
               {pendingCommand.phase && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-1">Phase</label>
-                  <p className="text-sm text-gray-900 dark:text-neutral-100">{pendingCommand.phase.replace('phase_', 'Phase ')}</p>
+                  <label className={`block text-sm font-medium mb-1 ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>Phase</label>
+                  <p className={`text-sm ${isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100'}`}>{pendingCommand.phase.replace('phase_', 'Phase ')}</p>
                 </div>
               )}
             </div>
@@ -196,7 +201,7 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
             {/* Triggered Keywords */}
             {pendingCommand.reason && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">Triggered Keywords</label>
+                <label className={`block text-sm font-medium mb-2 ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>Triggered Keywords</label>
                 <div className={`p-3 rounded-lg ${getSeverityColor(pendingCommand.reason)}`}>
                   <p className="text-sm font-medium">{pendingCommand.reason}</p>
                 </div>
@@ -205,8 +210,8 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
 
             {/* Timestamp */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-1">Requested At</label>
-              <p className="text-sm text-gray-600 dark:text-neutral-400">
+              <label className={`block text-sm font-medium mb-1 ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>Requested At</label>
+              <p className={`text-sm ${isOperator ? 'text-slate-400' : 'text-neutral-600 dark:text-neutral-400'}`}>
                 {new Date(pendingCommand.created_at).toLocaleString()}
               </p>
             </div>
@@ -215,14 +220,17 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
           {/* Rejection Input */}
           {showRejectInput && (
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-neutral-300 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>
                 Rejection Reason
               </label>
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Please provide a reason for rejecting this command..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isOperator
+                  ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100 placeholder-slate-500'
+                  : 'border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500'
+                }`}
                 rows={3}
                 disabled={isProcessing}
               />
@@ -231,10 +239,16 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-900">
+        <div className={`flex items-center justify-end gap-3 p-6 border-t ${isOperator
+          ? 'border-cyan-500/20 bg-slate-950/50'
+          : 'border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900'
+        }`}>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors"
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${isOperator
+              ? 'border border-slate-700 bg-slate-900/80 text-slate-300 hover:border-cyan-500/20 hover:bg-slate-800 hover:text-slate-100'
+              : 'text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+            }`}
             disabled={isProcessing}
           >
             Cancel
@@ -266,7 +280,10 @@ const PendingCommandModal = ({ pendingCommand, onClose, onApprove, onReject }) =
                   setRejectionReason('');
                   setError(null);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors"
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${isOperator
+                  ? 'border border-slate-700 bg-slate-900/80 text-slate-300 hover:border-cyan-500/20 hover:bg-slate-800 hover:text-slate-100'
+                  : 'text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                }`}
                 disabled={isProcessing}
               >
                 Back

@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Terminal, Check, X, Clock, ChevronDown, ChevronRight, Copy, Search } from '../icons';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CommandHistory = ({ commands }) => {
+  const { isOperator } = useTheme();
   const [expandedCommands, setExpandedCommands] = useState(new Set());
   const [filter, setFilter] = useState('all'); // all, success, failed
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,12 +57,37 @@ const CommandHistory = ({ commands }) => {
     avgTime: commands.reduce((acc, c) => acc + (c.execution_time || 0), 0) / commands.length || 0
   };
 
+  const borderClass = isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700';
+  const rowBg = isOperator ? 'bg-slate-950/40' : 'bg-white dark:bg-neutral-900';
+  const rowHover = isOperator ? 'hover:bg-cyan-500/5' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800';
+  const rowBorder = isOperator ? 'border-cyan-500/15' : 'border-neutral-200 dark:border-neutral-700';
+  const rowBorderHover = isOperator ? 'hover:border-cyan-400/30' : 'hover:border-neutral-300 dark:hover:border-neutral-600';
+  const mutedText = isOperator ? 'text-slate-400' : 'text-neutral-500 dark:text-neutral-400';
+  const normalText = isOperator ? 'text-slate-100' : 'text-neutral-900 dark:text-neutral-100';
+  const expandedBg = isOperator ? 'bg-slate-950/60 border-cyan-500/10' : 'bg-neutral-50/30 dark:bg-neutral-900/30 border-neutral-100 dark:border-neutral-800';
+  const codeBg = isOperator ? 'bg-[#020617] text-slate-200' : 'bg-neutral-900 dark:bg-black text-neutral-200';
+  const btnHover = isOperator ? 'hover:bg-cyan-500/10 hover:text-cyan-100 text-slate-400' : 'text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-600 dark:hover:text-neutral-300';
+  const inputClass = isOperator
+    ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100 placeholder-slate-500 focus:border-cyan-400/40'
+    : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:border-neutral-300 dark:focus:border-neutral-600';
+  const filterActive = isOperator ? 'bg-cyan-500 text-slate-950 border-cyan-500' : 'bg-blue-500 text-white border-blue-500';
+  const filterInactive = isOperator
+    ? 'bg-slate-950/60 text-slate-300 border-cyan-500/20 hover:border-cyan-400/30'
+    : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600';
+  const paginationBtn = isOperator
+    ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100'
+    : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100';
+  const selectClass = isOperator
+    ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100'
+    : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100';
+  const phaseBadge = isOperator ? 'bg-slate-800 text-slate-300' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300';
+
   if (commands.length === 0) {
     return (
       <div className="py-8 text-center">
-        <Terminal className="w-8 h-8 mx-auto text-gray-300 dark:text-neutral-600 mb-3" />
-        <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-100 mb-1">No Commands Yet</h3>
-        <p className="text-xs text-gray-500 dark:text-neutral-400">
+        <Terminal className={`w-8 h-8 mx-auto mb-3 ${isOperator ? 'text-slate-600' : 'text-neutral-300 dark:text-neutral-600'}`} />
+        <h3 className={`text-sm font-medium mb-1 ${normalText}`}>No Commands Yet</h3>
+        <p className={`text-xs ${mutedText}`}>
           Commands will appear here once you start executing them via Claude
         </p>
       </div>
@@ -81,13 +108,13 @@ const CommandHistory = ({ commands }) => {
         <div className="flex items-center gap-2">
           {/* Recherche */}
           <div className="relative">
-            <Search className="w-3 h-3 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-neutral-500" />
+            <Search className={`w-3 h-3 absolute left-2 top-1/2 transform -translate-y-1/2 ${mutedText}`} />
             <input
               type="text"
               placeholder="Search commands..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-7 pr-3 py-1 text-xs border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 placeholder-gray-400 dark:placeholder-neutral-500 rounded w-32 focus:outline-none focus:border-gray-300 dark:focus:border-neutral-600"
+              className={`pl-7 pr-3 py-1 text-xs border rounded w-32 focus:outline-none ${inputClass}`}
             />
           </div>
 
@@ -101,10 +128,7 @@ const CommandHistory = ({ commands }) => {
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`px-2 py-1 text-xs rounded border transition-colors ${filter === key
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white dark:bg-neutral-900 text-gray-600 dark:text-neutral-300 border-gray-200 dark:border-neutral-700 hover:border-gray-300 dark:hover:border-neutral-600'
-                  }`}
+                className={`px-2 py-1 text-xs rounded border transition-colors ${filter === key ? filterActive : filterInactive}`}
                 title={`${label} (${count})`}
               >
                 {label}
@@ -120,14 +144,14 @@ const CommandHistory = ({ commands }) => {
           const isExpanded = expandedCommands.has(cmd.id);
 
           return (
-            <div key={cmd.id} id={`command-${cmd.id}`} className="border border-gray-200 dark:border-neutral-700 rounded bg-white dark:bg-neutral-900 hover:border-gray-300 dark:hover:border-neutral-600 transition-colors">
+            <div key={cmd.id} id={`command-${cmd.id}`} className={`border ${rowBorder} ${rowBorderHover} rounded ${rowBg} transition-colors`}>
               {/* Command Header Compact */}
               <div
                 onClick={() => toggleCommand(cmd.id)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleCommand(cmd.id); }}
-                className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className={`w-full px-3 py-2 flex items-center gap-2 text-left ${rowHover} transition-colors cursor-pointer`}
               >
                 {/* Status Indicator */}
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cmd.success ? 'bg-green-500' : 'bg-red-500'
@@ -165,7 +189,7 @@ const CommandHistory = ({ commands }) => {
                     </span>
                   )}
                   {cmd.phase && (
-                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 rounded text-xs">
+                    <span className={`px-1.5 py-0.5 ${phaseBadge} rounded text-xs`}>
                       {cmd.phase.replace('Phase ', 'P')}
                     </span>
                   )}
@@ -180,7 +204,7 @@ const CommandHistory = ({ commands }) => {
                       e.stopPropagation(); // Prevent expanding when copying
                       copyToClipboard(cmd.command);
                     }}
-                    className="p-1 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded text-gray-400 dark:text-neutral-500 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors"
+                    className={`p-1 rounded transition-colors ${btnHover}`}
                     title="Copy command"
                   >
                     <Copy className="w-3 h-3" />
@@ -195,16 +219,16 @@ const CommandHistory = ({ commands }) => {
 
                   {/* Expand */}
                   {isExpanded ? (
-                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                    <ChevronDown className={`w-3 h-3 ${mutedText}`} />
                   ) : (
-                    <ChevronRight className="w-3 h-3 text-gray-400" />
+                    <ChevronRight className={`w-3 h-3 ${mutedText}`} />
                   )}
                 </div>
               </div>
 
               {/* Expanded Content Compact */}
               {isExpanded && (
-                <div className="px-3 pb-3 border-t border-gray-100 dark:border-neutral-800 bg-gray-50/30 dark:bg-neutral-900/30">
+                <div className={`px-3 pb-3 border-t ${expandedBg}`}>
                   <div className="pt-2 space-y-2">
                     {/* Python source code block */}
                     {cmd.command_type === 'python' && cmd.source_code && (
@@ -215,13 +239,13 @@ const CommandHistory = ({ commands }) => {
                           </h4>
                           <button
                             onClick={() => copyToClipboard(cmd.source_code)}
-                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200 px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+                            className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ${btnHover}`}
                           >
                             <Copy className="w-3 h-3" />
                             Copy
                           </button>
                         </div>
-                        <pre className="bg-gray-900 dark:bg-black text-emerald-300 p-2 rounded font-mono text-xs max-h-48 overflow-auto whitespace-pre-wrap">
+                        <pre className={`${codeBg} text-emerald-300 p-2 rounded font-mono text-xs max-h-48 overflow-auto whitespace-pre-wrap`}>
                           {cmd.source_code}
                         </pre>
                       </div>
@@ -236,13 +260,13 @@ const CommandHistory = ({ commands }) => {
                           </h4>
                           <button
                             onClick={() => copyToClipboard(cmd.source_code)}
-                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200 px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+                            className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ${btnHover}`}
                           >
                             <Copy className="w-3 h-3" />
                             Copy
                           </button>
                         </div>
-                        <pre className="bg-gray-900 dark:bg-black text-blue-300 p-2 rounded font-mono text-xs max-h-48 overflow-auto whitespace-pre-wrap">
+                        <pre className={`${codeBg} text-blue-300 p-2 rounded font-mono text-xs max-h-48 overflow-auto whitespace-pre-wrap`}>
                           {cmd.source_code}
                         </pre>
                       </div>
@@ -252,16 +276,16 @@ const CommandHistory = ({ commands }) => {
                     {cmd.stdout && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <h4 className="text-xs font-semibold text-gray-700 dark:text-neutral-300">Output</h4>
+                          <h4 className={`text-xs font-semibold ${isOperator ? 'text-slate-300' : 'text-neutral-700 dark:text-neutral-300'}`}>Output</h4>
                           <button
                             onClick={() => copyToClipboard(cmd.stdout)}
-                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200 px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+                            className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ${btnHover}`}
                           >
                             <Copy className="w-3 h-3" />
                             Copy
                           </button>
                         </div>
-                        <pre className="bg-gray-900 dark:bg-black text-gray-100 dark:text-neutral-200 p-2 rounded font-mono text-xs max-h-32 overflow-auto whitespace-pre-wrap">
+                        <pre className={`${codeBg} p-2 rounded font-mono text-xs max-h-32 overflow-auto whitespace-pre-wrap`}>
                           {cmd.stdout}
                         </pre>
                       </div>
@@ -274,7 +298,7 @@ const CommandHistory = ({ commands }) => {
                           <h4 className="text-xs font-semibold text-red-700 dark:text-red-400">Error</h4>
                           <button
                             onClick={() => copyToClipboard(cmd.stderr)}
-                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-200 px-1.5 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-neutral-800 transition-colors"
+                            className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ${btnHover}`}
                           >
                             <Copy className="w-3 h-3" />
                             Copy
@@ -287,7 +311,7 @@ const CommandHistory = ({ commands }) => {
                     )}
 
                     {/* Command Details Compact */}
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-neutral-400 pt-1 border-t border-gray-200 dark:border-neutral-800">
+                    <div className={`flex items-center gap-4 text-xs ${mutedText} pt-1 border-t ${borderClass}`}>
                       <span>Code: {cmd.returncode}</span>
                       {cmd.container_name && <span>Container: {cmd.container_name}</span>}
                       <span>{new Date(cmd.created_at).toLocaleString()}</span>
@@ -302,8 +326,8 @@ const CommandHistory = ({ commands }) => {
 
       {/* Pagination et contrôles */}
       {filteredCommands.length > 0 && (
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-neutral-700">
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-neutral-400">
+        <div className={`flex items-center justify-between pt-2 border-t ${borderClass}`}>
+          <div className={`flex items-center gap-2 text-xs ${mutedText}`}>
             <span>Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredCommands.length)} of {filteredCommands.length}</span>
             {stats.avgTime > 0 && (
               <span>• Avg time: {stats.avgTime.toFixed(1)}s</span>
@@ -318,7 +342,7 @@ const CommandHistory = ({ commands }) => {
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="text-xs border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 rounded px-2 py-1"
+              className={`text-xs border rounded px-2 py-1 ${selectClass}`}
             >
               <option value={10}>10/page</option>
               <option value={20}>20/page</option>
@@ -331,19 +355,19 @@ const CommandHistory = ({ commands }) => {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-2 py-1 text-xs border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-neutral-800"
+                className={`px-2 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed ${paginationBtn} ${rowHover}`}
               >
                 ←
               </button>
 
-              <span className="px-2 py-1 text-xs text-gray-600 dark:text-neutral-300">
+              <span className={`px-2 py-1 text-xs ${mutedText}`}>
                 {currentPage} / {totalPages}
               </span>
 
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-2 py-1 text-xs border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-gray-900 dark:text-neutral-100 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-neutral-800"
+                className={`px-2 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed ${paginationBtn} ${rowHover}`}
               >
                 →
               </button>

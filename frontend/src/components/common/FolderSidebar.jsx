@@ -9,6 +9,7 @@ import {
   MoreVertical,
   Edit3
 } from '../icons';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const FolderSidebar = ({
   folders = [],
@@ -19,6 +20,7 @@ const FolderSidebar = ({
   onEditFolder,
   className = ""
 }) => {
+  const { isOperator } = useTheme();
   const [contextMenuFolder, setContextMenuFolder] = useState(null);
 
   // Calculate counts for status views
@@ -62,12 +64,12 @@ const FolderSidebar = ({
   }));
 
   return (
-    <div className={`relative w-64 bg-white dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700 h-full flex flex-col ${className}`}>
+    <div className={`relative w-64 border-r h-full flex flex-col ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'} ${className}`}>
       {/* Subtle separator from main sidebar */}
       <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-neutral-300 dark:via-neutral-600 to-transparent opacity-50" />
 
       {/* Header */}
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
+      <div className={`p-4 border-b ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
         <h2 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Views</h2>
       </div>
 
@@ -85,8 +87,8 @@ const FolderSidebar = ({
                   key={view.id}
                   onClick={() => onViewChange(view.id)}
                   className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors ${isActive
-                    ? 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-700'
-                    : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                    ? (isOperator ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-700')
+                    : (isOperator ? 'text-slate-300 hover:bg-cyan-500/5' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')
                     }`}
                 >
                   <div className="flex items-center gap-2">
@@ -94,8 +96,8 @@ const FolderSidebar = ({
                     <span className="font-medium">{view.name}</span>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${isActive
-                    ? 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                    : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300'
+                    ? (isOperator ? 'bg-cyan-500/10 text-cyan-300' : 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300')
+                    : (isOperator ? 'bg-slate-800 text-slate-400' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300')
                     }`}>
                     {view.count}
                   </span>
@@ -112,7 +114,7 @@ const FolderSidebar = ({
                 <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
                   My Folders
                 </h3>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${isOperator ? 'bg-slate-800 text-slate-400' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300'}`}>
                   {customFolders.length}
                 </span>
               </div>
@@ -129,8 +131,8 @@ const FolderSidebar = ({
                         <button
                           onClick={() => onViewChange(folder.id)}
                           className={`flex-1 flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${isActive
-                            ? 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-700'
-                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                            ? (isOperator ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-700')
+                            : (isOperator ? 'text-slate-300 hover:bg-cyan-500/5' : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700')
                             }`}
                         >
                           <Icon className="w-4 h-4 flex-shrink-0" style={{ color: folder.color }} />
@@ -138,8 +140,8 @@ const FolderSidebar = ({
                             {folder.name}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${isActive
-                            ? 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                            : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300'
+                            ? (isOperator ? 'bg-cyan-500/10 text-cyan-300' : 'bg-primary-100/50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300')
+                            : (isOperator ? 'bg-slate-800 text-slate-400' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300')
                             }`}>
                             {folder.count}
                           </span>
@@ -149,7 +151,7 @@ const FolderSidebar = ({
                             e.stopPropagation();
                             setContextMenuFolder(contextMenuFolder === folder.id ? null : folder.id);
                           }}
-                          className="absolute right-1 p-1.5 opacity-0 group-hover:opacity-100 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded transition-all z-10"
+                          className={`absolute right-1 p-1.5 opacity-0 group-hover:opacity-100 rounded transition-all z-10 ${isOperator ? 'hover:bg-cyan-500/10' : 'hover:bg-neutral-200 dark:hover:bg-neutral-600'}`}
                           title="Folder options"
                         >
                           <MoreVertical className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
@@ -163,13 +165,13 @@ const FolderSidebar = ({
                             className="fixed inset-0 z-10"
                             onClick={() => setContextMenuFolder(null)}
                           />
-                          <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-600 rounded-md shadow-lg z-20">
+                          <div className={`absolute top-full right-0 mt-1 w-48 border rounded-md shadow-lg z-20 ${isOperator ? 'bg-slate-900 border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-600'}`}>
                             <button
                               onClick={() => {
                                 onEditFolder(folder.folder);
                                 setContextMenuFolder(null);
                               }}
-                              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-left text-neutral-900 dark:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors rounded-md"
+                              className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left rounded-md transition-colors ${isOperator ? 'text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-200' : 'text-neutral-900 dark:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-700'}`}
                             >
                               <Edit3 className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
                               <span>Edit Folder</span>
@@ -187,7 +189,7 @@ const FolderSidebar = ({
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-700">
+      <div className={`p-4 border-t ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
         <button
           onClick={onCreateFolder}
           className="w-full btn btn-ghost btn-sm justify-start"

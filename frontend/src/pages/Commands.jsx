@@ -7,8 +7,10 @@ import toolStatsService from '../services/toolStatsService';
 import useInfiniteScroll from '../hooks/useInfiniteScroll';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
 import { usePendingCommands } from '../contexts/PendingCommandsContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Commands = () => {
+  const { isOperator } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Stats state
@@ -374,7 +376,7 @@ const Commands = () => {
       <div className="grid grid-cols-4 gap-4">
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+            <div className={`p-2 rounded-lg ${isOperator ? 'bg-slate-800' : 'bg-neutral-100 dark:bg-neutral-800'}`}>
               <Terminal className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
             </div>
             <div>
@@ -385,7 +387,7 @@ const Commands = () => {
         </div>
         <div className="card p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+            <div className={`p-2 rounded-lg ${isOperator ? 'bg-slate-800' : 'bg-neutral-100 dark:bg-neutral-800'}`}>
               <Clock className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
             </div>
             <div>
@@ -467,11 +469,14 @@ const Commands = () => {
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search commands..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={`w-full pl-9 pr-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isOperator
+                  ? 'border-cyan-500/20 bg-slate-950/60 text-slate-100 placeholder-slate-500'
+                  : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800'
+                }`}
               />
             </div>
             {/* Status filter */}
-            <div className="flex items-center text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+            <div className={`flex items-center text-xs border rounded-lg overflow-hidden ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
               {[
                 { value: 'all',    label: 'All',    dot: null },
                 { value: 'passed', label: 'Passed', dot: 'bg-green-500' },
@@ -482,8 +487,8 @@ const Commands = () => {
                   onClick={() => handleStatusFilterChange(value)}
                   className={`px-3 py-2 transition-colors flex items-center gap-1.5 ${
                     statusFilter === value
-                      ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
-                      : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                      ? (isOperator ? 'bg-cyan-500/20 text-cyan-200' : 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900')
+                      : (isOperator ? 'text-slate-400 hover:bg-cyan-500/10 hover:text-slate-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800')
                   }`}
                 >
                   {dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot} ${statusFilter === value ? 'opacity-70' : ''}`} />}
@@ -492,7 +497,7 @@ const Commands = () => {
               ))}
             </div>
             {/* Type filter */}
-            <div className="flex items-center text-xs border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+            <div className={`flex items-center text-xs border rounded-lg overflow-hidden ${isOperator ? 'border-cyan-500/20' : 'border-neutral-200 dark:border-neutral-700'}`}>
               {[
                 { value: 'all',    label: 'All',    dot: null },
                 { value: 'shell',  label: 'Shell',  dot: 'bg-neutral-400' },
@@ -504,8 +509,8 @@ const Commands = () => {
                   onClick={() => handleTypeFilterChange(value)}
                   className={`px-3 py-2 transition-colors flex items-center gap-1.5 ${
                     typeFilter === value
-                      ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
-                      : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                      ? (isOperator ? 'bg-cyan-500/20 text-cyan-200' : 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900')
+                      : (isOperator ? 'text-slate-400 hover:bg-cyan-500/10 hover:text-slate-200' : 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800')
                   }`}
                 >
                   {dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot} ${typeFilter === value ? 'opacity-70' : ''}`} />}
@@ -549,7 +554,7 @@ const Commands = () => {
                 <tbody>
                   {commands.map((cmd) => (
                     <Fragment key={cmd.id}>
-                      <tr className="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50" onClick={() => setExpandedCommand(expandedCommand === cmd.id ? null : cmd.id)}>
+                      <tr className={`cursor-pointer ${isOperator ? 'hover:bg-cyan-500/5' : 'hover:bg-neutral-50 dark:hover:bg-neutral-800/50'}`} onClick={() => setExpandedCommand(expandedCommand === cmd.id ? null : cmd.id)}>
                         <td><div className={`w-2 h-2 rounded-full ${getStatusDot(null, cmd.success)}`} /></td>
                         <td>
                           {cmd.command_type === 'python' ? (
@@ -579,7 +584,7 @@ const Commands = () => {
                       </tr>
                       {expandedCommand === cmd.id && (
                         <tr>
-                          <td colSpan="6" className="p-4 bg-neutral-50 dark:bg-neutral-800/50">
+                          <td colSpan="6" className={`p-4 ${isOperator ? 'bg-slate-950/60' : 'bg-neutral-50 dark:bg-neutral-800/50'}`}>
                             <div className="space-y-3">
                               <div>
                                 <span className="text-xs font-medium text-neutral-500 uppercase flex items-center gap-1.5">

@@ -4,8 +4,10 @@ import { getSeverityBadgeClass, getSeverityBarClass, getSeverityTextClass } from
 import UnifiedModal from '../common/UnifiedModal';
 import CvssCalculator from './CvssCalculator';
 import apiClient from '../../services/api';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, externalTrigger = 0 }) => {
+  const { isOperator } = useTheme();
   const [expandedCards, setExpandedCards] = useState(new Set());
 
   // Modal state for Add/Edit
@@ -210,7 +212,7 @@ const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, exte
           const isFalsePositive = card.status === 'false_positive';
 
           return (
-            <div key={card.id} id={`card-${card.id}`} className={`flex border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden bg-white dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors ${isFalsePositive ? 'opacity-50' : ''}`}>
+            <div key={card.id} id={`card-${card.id}`} className={`flex border rounded-lg overflow-hidden transition-colors ${isFalsePositive ? 'opacity-50' : ''} ${isOperator ? 'border-cyan-500/20 bg-slate-950/40 hover:border-cyan-500/40' : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600'}`}>
               {/* Left color strip */}
               <div className={`w-1 flex-shrink-0 ${
                 cardType === 'finding'     ? getSeverityBarClass(severity) :
@@ -310,13 +312,13 @@ const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, exte
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="px-4 pb-4 border-t border-neutral-100 dark:border-neutral-700 bg-neutral-50/30 dark:bg-neutral-700/30">
+                <div className={`px-4 pb-4 border-t ${isOperator ? 'border-cyan-500/10 bg-slate-900/40' : 'border-neutral-100 dark:border-neutral-700 bg-neutral-50/30 dark:bg-neutral-700/30'}`}>
                   <div className="pt-4 space-y-4">
                     {/* Technical Analysis */}
                     {card.technical_analysis && (
                       <div>
                         <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Technical Analysis</h4>
-                        <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-white dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
+                        <div className={`text-sm text-neutral-600 dark:text-neutral-300 p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
                           <div className="whitespace-pre-wrap break-words">{card.technical_analysis}</div>
                         </div>
                       </div>
@@ -326,7 +328,7 @@ const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, exte
                     {card.proof && (
                       <div>
                         <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Proof</h4>
-                        <div className="overflow-x-auto bg-white dark:bg-neutral-800 rounded border border-neutral-200 dark:border-neutral-700">
+                        <div className={`overflow-x-auto rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
                           <pre className="p-3 text-xs font-mono text-neutral-600 dark:text-neutral-300 whitespace-pre">{card.proof}</pre>
                         </div>
                       </div>
@@ -336,7 +338,7 @@ const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, exte
                     {card.notes && (
                       <div>
                         <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Notes</h4>
-                        <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-white dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
+                        <div className={`text-sm text-neutral-600 dark:text-neutral-300 p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
                           <div className="whitespace-pre-wrap break-words">{card.notes}</div>
                         </div>
                       </div>
@@ -346,7 +348,7 @@ const CardsTable = ({ cards, assessmentId, onUpdate, hideAddButton = false, exte
                     {card.context && (
                       <div>
                         <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">Context</h4>
-                        <div className="text-sm text-neutral-600 dark:text-neutral-300 bg-white dark:bg-neutral-800 p-3 rounded border border-neutral-200 dark:border-neutral-700">
+                        <div className={`text-sm text-neutral-600 dark:text-neutral-300 p-3 rounded border ${isOperator ? 'bg-slate-950/60 border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
                           <div className="whitespace-pre-wrap break-words">{card.context}</div>
                         </div>
                       </div>

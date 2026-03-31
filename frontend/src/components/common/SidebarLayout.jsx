@@ -1,4 +1,5 @@
 import FolderSidebar from './FolderSidebar';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const SidebarLayout = ({
   children,
@@ -10,6 +11,7 @@ const SidebarLayout = ({
   onEditFolder,
   className = ""
 }) => {
+  const { isOperator } = useTheme();
   return (
     <div className={`flex h-full ${className}`}>
       {/* Folder Sidebar - Seamless with Main Sidebar */}
@@ -26,7 +28,7 @@ const SidebarLayout = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-neutral-50 dark:bg-neutral-900">
+      <div className={`flex-1 flex flex-col min-w-0 ${isOperator ? 'bg-transparent' : 'bg-neutral-50 dark:bg-neutral-900'}`}>
         <div className="p-6 overflow-auto">
           {children}
         </div>

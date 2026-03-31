@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import apiClient from '../../services/api';
 import { decodeJWT, formatExpirationTime } from '../../utils/jwtDecoder';
 import { Trash2, Copy, Eye, EyeOff, Plus, X, Edit2 } from '../icons';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const CredentialsManager = ({ assessmentId, onUpdate }) => {
+  const { isOperator } = useTheme();
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -312,7 +314,7 @@ const CredentialModal = ({ assessmentId, credential, onClose, onSuccess }) => {
           </h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded transition-colors"
+            className={`p-1 rounded transition-colors ${isOperator ? 'hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-100' : 'hover:bg-neutral-100 dark:hover:bg-neutral-700'}`}
           >
             <X className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
           </button>
@@ -355,7 +357,7 @@ const CredentialModal = ({ assessmentId, credential, onClose, onSuccess }) => {
             />
             {formData.name && (
               <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">
-                Placeholder: <code className="bg-gray-100 dark:bg-neutral-700 px-1 rounded font-mono">{generatePlaceholder(formData.name, formData.credential_type)}</code>
+                Placeholder: <code className={`px-1 rounded font-mono ${isOperator ? 'bg-slate-800 text-slate-300' : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300'}`}>{generatePlaceholder(formData.name, formData.credential_type)}</code>
               </p>
             )}
           </div>
@@ -479,7 +481,10 @@ const CredentialModal = ({ assessmentId, credential, onClose, onSuccess }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-700 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+              className={`px-4 py-2 text-sm rounded-lg transition-colors ${isOperator
+                ? 'text-slate-300 hover:bg-cyan-500/10 hover:text-cyan-100'
+                : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+              }`}
               disabled={saving}
             >
               Cancel

@@ -10,8 +10,10 @@ import EditFolderModal from '../components/common/EditFolderModal';
 import AssessmentsTable from '../components/common/AssessmentsTable';
 import SidebarLayout from '../components/common/SidebarLayout';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Assessments = () => {
+  const { isOperator } = useTheme();
   const [assessments, setAssessments] = useState([]);
   const [allAssessments, setAllAssessments] = useState([]); // For accurate counting
   const [folders, setFolders] = useState([]);
@@ -253,7 +255,7 @@ const Assessments = () => {
           </div>
 
           {/* Current View Info */}
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+          <div className={`border rounded-lg p-4 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
@@ -268,7 +270,7 @@ const Assessments = () => {
           </div>
 
           {/* Search Bar */}
-          <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+          <div className={`border rounded-lg p-4 ${isOperator ? 'bg-[rgba(8,15,36,0.96)] border-cyan-500/20' : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700'}`}>
             <div className="flex items-center gap-3">
               <div className="flex-1 max-w-md relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 dark:text-neutral-500" />
