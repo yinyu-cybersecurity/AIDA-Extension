@@ -1,4 +1,5 @@
 import json
+import asyncio
 from pathlib import Path
 from typing import AsyncGenerator, Dict, Any, List
 from sqlalchemy import func
@@ -290,7 +291,10 @@ class AIAgentService:
                 logger.info(f'Agent calling tool {function_name}', arguments=arguments, assessment_id=assessment_id)
 
                 try:
-                    tool_result_contents = await handle_tool_call(function_name, arguments, self.mcp_service)
+                    tool_result_contents = await asyncio.wait_for(
+                        handle_tool_call(function_name, arguments, self.mcp_service),
+                        timeout=180.0
+                    )
                     result_text = '\n'.join([content.text for content in tool_result_contents if content.type == 'text'])
 
                     output_text = (
@@ -321,6 +325,36 @@ class AIAgentService:
                             'sequence_number': tool_entry.sequence_number,
                             'message': output_text,
                             'output': output_text,
+                            'tool': function_name,
+                        },
+                        assessment_id=assessment_id
+                    )
+
+                except asyncio.TimeoutError:
+                    logger.error(f'Tool execution timeout: {function_name}')
+                    result_text = f'Tool {function_name} timed out after 120 seconds.'
+                    tool_message = {
+                        'tool_call_id': tool_call.id,
+                        'role': 'tool',
+                        'name': function_name,
+                        'content': result_text
+                    }
+                    messages.append(tool_message)
+                    error_entry = self._persist_ai_message(
+                        assessment_id,
+                        role='tool',
+                        event_type=EventType.AGENT_ERROR,
+                        content=result_text,
+                        message_payload=tool_message,
+                        tool_name=function_name,
+                    )
+                    yield create_event(
+                        EventType.AGENT_ERROR,
+                        {
+                            'id': error_entry.id,
+                            'sequence_number': error_entry.sequence_number,
+                            'message': result_text,
+                            'error': result_text,
                             'tool': function_name,
                         },
                         assessment_id=assessment_id

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import Assessment, AssessmentSection, Card, ReconData, Folder, CommandHistory, AssessmentAIMessage
+from mcp_custom.modules.mcp_tools import get_tool_definitions
 from schemas.assessment import (
     AssessmentCreate,
     AssessmentUpdate,
@@ -110,6 +111,29 @@ async def get_assessment_ai_history(
         .order_by(AssessmentAIMessage.sequence_number.asc(), AssessmentAIMessage.id.asc())
         .all()
     )
+
+
+@router.delete("/{assessment_id}/ai-history", status_code=204)
+async def clear_assessment_ai_history(
+    assessment_id: int,
+    db: Session = Depends(get_db)
+):
+    """Clear all AI chat history for an assessment"""
+    assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+    if not assessment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Assessment with id {assessment_id} not found"
+        )
+    db.query(AssessmentAIMessage).filter(AssessmentAIMessage.assessment_id == assessment_id).delete()
+    db.commit()
+
+
+@router.get("/ai-tools")
+async def get_ai_tools():
+    """Return all available MCP tool definitions (name + description)"""
+    tools = get_tool_definitions()
+    return [{"name": t.name, "description": t.description} for t in tools]
 
 
 @router.get("/{assessment_id}", response_model=AssessmentResponse)

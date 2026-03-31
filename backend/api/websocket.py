@@ -11,6 +11,7 @@ import asyncio
 
 logger = get_logger(__name__)
 assessment_agent_locks: dict[int, asyncio.Lock] = {}
+assessment_agent_tasks: dict[int, asyncio.Task] = {}
 
 
 def get_assessment_agent_lock(assessment_id: int) -> asyncio.Lock:
@@ -141,12 +142,26 @@ async def websocket_assessment(websocket: WebSocket, assessment_id: int):
                     )
                     logger.debug("Responded to ping", assessment_id=assessment_id)
 
+                elif message_type == "cancel":
+                    task = assessment_agent_tasks.get(assessment_id)
+                    if task and not task.done():
+                        task.cancel()
+                        logger.info("Agent task cancelled by user", assessment_id=assessment_id)
+                        await manager.send_personal(
+                            websocket,
+                            create_event(
+                                EventType.AGENT_DONE,
+                                {"message": "Cancelled by user.", "cancelled": True},
+                                assessment_id=assessment_id,
+                            )
+                        )
+
                 elif message_type == "agent_input":
                     user_input = message.get("input")
                     if user_input:
                         logger.info("Received agent input", assessment_id=assessment_id)
-                        assessment_lock = get_assessment_agent_lock(assessment_id)
-                        if assessment_lock.locked():
+                        existing_task = assessment_agent_tasks.get(assessment_id)
+                        if existing_task and not existing_task.done():
                             await manager.send_personal(
                                 websocket,
                                 create_event(
@@ -156,8 +171,8 @@ async def websocket_assessment(websocket: WebSocket, assessment_id: int):
                                 )
                             )
                             continue
-                        # Start agent loop in a separate task to not block the WebSocket
-                        asyncio.create_task(handle_agent_interaction(assessment_id, user_input))
+                        task = asyncio.create_task(handle_agent_interaction(assessment_id, user_input))
+                        assessment_agent_tasks[assessment_id] = task
 
                 else:
                     logger.warning(
@@ -197,18 +212,18 @@ async def websocket_assessment(websocket: WebSocket, assessment_id: int):
 
 async def handle_agent_interaction(assessment_id: int, user_input: str):
     """Handle AI Agent interaction and broadcast events"""
-    lock = get_assessment_agent_lock(assessment_id)
-    async with lock:
-        try:
-            async for event in agent_service.run_agent_loop(assessment_id, user_input):
-                await manager.broadcast(event, assessment_id=assessment_id)
-        except Exception as e:
-            logger.error(f"Agent loop error: {e}", assessment_id=assessment_id, exc_info=True)
-            await manager.broadcast(
-                create_event(
-                    EventType.AGENT_ERROR,
-                    {"message": f"AI Agent error: {str(e)}", "error": str(e)},
-                    assessment_id=assessment_id,
-                ),
-                assessment_id=assessment_id
-            )
+    try:
+        async for event in agent_service.run_agent_loop(assessment_id, user_input):
+            await manager.broadcast(event, assessment_id=assessment_id)
+    except asyncio.CancelledError:
+        logger.info(f"Agent task cancelled", assessment_id=assessment_id)
+    except Exception as e:
+        logger.error(f"Agent loop error: {e}", assessment_id=assessment_id, exc_info=True)
+        await manager.broadcast(
+            create_event(
+                EventType.AGENT_ERROR,
+                {"message": f"AI Agent error: {str(e)}", "error": str(e)},
+                assessment_id=assessment_id,
+            ),
+            assessment_id=assessment_id
+        )
