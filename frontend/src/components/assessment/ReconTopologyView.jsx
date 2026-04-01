@@ -82,6 +82,7 @@ const getCollisionRadius = (node) => {
   const base = (node?.val || 6) + 16;
 
   if (node?.isRoot) return base + 20;
+  if (node?.isFindingNode) return base + 18;
   if (node?.highestSeverity === 'CRITICAL') return base + 16;
   if (node?.highestSeverity) return base + 12;
   if (node?.findingCount > 0) return base + 8;
@@ -215,8 +216,8 @@ const ReconTopologyView = ({
 
       const isRootLink = targetId === rootId;
       links.push({
-        source: sourceId,
-        target: targetId,
+        source: targetId,
+        target: sourceId,
         isRootLink,
         distance: isRootLink
           ? 260
@@ -231,21 +232,54 @@ const ReconTopologyView = ({
 
     cards.forEach((card) => {
       const target = normalizeTargetService(card.target_service);
-      if (!target) {
-        attachCard(rootId, card);
-        return;
+      let parentId = rootId;
+
+      if (target) {
+        const matchingNode = nodes.find((node) => !node.isRoot && node.normalizedName && (
+          node.normalizedName === target ||
+          node.normalizedName.includes(target) ||
+          target.includes(node.normalizedName)
+        ));
+        if (matchingNode) parentId = matchingNode.id;
       }
 
-      const matchingNode = nodes.find((node) => !node.isRoot && node.normalizedName && (
-        node.normalizedName === target ||
-        node.normalizedName.includes(target) ||
-        target.includes(node.normalizedName)
-      ));
+      attachCard(parentId, card);
 
-      attachCard(matchingNode?.id || rootId, card);
+      if (card.card_type === 'finding') {
+        const findingNodeId = `finding-${card.id}`;
+        const sev = card.severity || 'INFO';
+        const findingNode = {
+          id: findingNodeId,
+          name: card.title,
+          data_type: 'finding',
+          details: card,
+          originalItem: null, // Findings are not editable recon assets
+          relatedCards: [],
+          highestSeverity: sev,
+          val: getNodeSize('finding', sev),
+          color: getNodeColor('finding', card.title, sev),
+          isFindingNode: true,
+          findingCount: 0,
+          observationCount: 0,
+          infoCount: 0,
+        };
+        nodes.push(findingNode);
+        nodeIndex.set(findingNodeId, findingNode);
+
+        links.push({
+          source: parentId,
+          target: findingNodeId,
+          isRootLink: false,
+          isFindingLink: true,
+          distance: 120,
+          color: getNodeColor('finding', card.title, sev)
+        });
+      }
     });
 
     nodes.forEach((node) => {
+      if (node.isFindingNode) return;
+      
       const relatedCards = relatedCardsMap.get(node.id) || node.relatedCards || [];
       node.relatedCards = relatedCards;
       node.highestSeverity = getHighestSeverity(relatedCards) || node.highestSeverity;
@@ -254,29 +288,6 @@ const ReconTopologyView = ({
       node.findingCount = relatedCards.filter((card) => card.card_type === 'finding').length;
       node.observationCount = relatedCards.filter((card) => card.card_type === 'observation').length;
       node.infoCount = relatedCards.filter((card) => card.card_type === 'info').length;
-    });
-
-    const nodesByType = new Map();
-    nodes.filter((node) => !node.isRoot).forEach((node) => {
-      if (!nodesByType.has(node.data_type)) {
-        nodesByType.set(node.data_type, []);
-      }
-      nodesByType.get(node.data_type).push(node);
-    });
-
-    nodesByType.forEach((typeNodes, type) => {
-      const radius = TYPE_RING_RADIUS[type] || 420;
-      const angleOffset = TYPE_RING_OFFSET[type] || 0;
-      const sortedNodes = [...typeNodes].sort((a, b) => {
-        if (a.findingCount !== b.findingCount) return b.findingCount - a.findingCount;
-        return a.name.localeCompare(b.name);
-      });
-
-      sortedNodes.forEach((node, index) => {
-        const angle = angleOffset + ((Math.PI * 2) / Math.max(sortedNodes.length, 1)) * index;
-        node.x = Math.cos(angle) * radius;
-        node.y = Math.sin(angle) * radius * 0.72;
-      });
     });
 
     return { nodes, links };
@@ -382,6 +393,7 @@ const ReconTopologyView = ({
     if (chargeForce?.strength) {
       chargeForce.strength((node) => {
         if (node.isRoot) return -2200;
+        if (node.isFindingNode) return -450;
         if (node.highestSeverity === 'CRITICAL') return -1100;
         if (node.highestSeverity) return -920;
         if (['service', 'endpoint', 'technology'].includes(node.data_type)) return -760;
@@ -394,9 +406,9 @@ const ReconTopologyView = ({
 
     const linkForce = graph.d3Force('link');
     if (linkForce?.distance) {
-      linkForce.distance((link) => link.distance || (link.isRootLink ? 260 : 185));
+      linkForce.distance((link) => link.distance || (link.isRootLink ? 260 : link.isFindingLink ? 110 : 185));
       if (linkForce.strength) {
-        linkForce.strength((link) => (link.isRootLink ? 0.14 : 0.42));
+        linkForce.strength((link) => link.isRootLink ? 0.14 : link.isFindingLink ? 0.6 : 0.42);
       }
       if (linkForce.iterations) {
         linkForce.iterations(2);
@@ -534,16 +546,16 @@ const ReconTopologyView = ({
               graphData={topologyData}
               backgroundColor="#020617"
               linkColor={(link) => link.color || '#1e293b'}
-              linkWidth={(link) => link.color && link.color !== '#1e293b' ? 2.4 : 1.15}
-              linkDirectionalParticles={(link) => link.color && link.color !== '#1e293b' ? 2 : 0}
+              linkWidth={(link) => link.isFindingLink ? 3 : (link.color && link.color !== '#1e293b' ? 2.4 : 1.15)}
+              linkDirectionalParticles={(link) => link.isFindingLink ? 4 : (link.color && link.color !== '#1e293b' ? 2 : 0)}
               linkDirectionalParticleColor={(link) => link.color || '#22d3ee'}
-              linkDirectionalParticleWidth={2}
+              linkDirectionalParticleWidth={(link) => link.isFindingLink ? 3 : 2}
               onNodeClick={handleNodeClick}
               cooldownTicks={160}
               warmupTicks={32}
               nodeRelSize={1}
               nodeVal="val"
-              enableNodeDrag={false}
+              enableNodeDrag={true}
               nodeCanvasObjectMode={() => 'after'}
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const radius = node.val || 6;
@@ -558,6 +570,37 @@ const ReconTopologyView = ({
                   globalScale > 1.35;
 
                 ctx.save();
+
+                if (node.isFindingNode) {
+                  ctx.beginPath();
+                  ctx.fillStyle = node.color;
+                  ctx.shadowColor = glowColor;
+                  ctx.shadowBlur = node.highestSeverity === 'CRITICAL' ? 35 : 20;
+
+                  const s = radius * 1.3;
+                  ctx.moveTo(node.x, node.y - s);
+                  ctx.lineTo(node.x + s, node.y);
+                  ctx.lineTo(node.x, node.y + s);
+                  ctx.lineTo(node.x - s, node.y);
+                  ctx.closePath();
+                  ctx.fill();
+
+                  ctx.lineWidth = 1.5;
+                  ctx.strokeStyle = '#fff';
+                  ctx.stroke();
+
+                  if (shouldShowLabel) {
+                    ctx.font = `bold ${fontSize * 1.1}px Sans-Serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#f87171';
+                    ctx.shadowBlur = 0;
+                    ctx.fillText(label, node.x, node.y + getCollisionRadius(node) * 0.55);
+                  }
+                  ctx.restore();
+                  return;
+                }
+
                 ctx.beginPath();
                 ctx.fillStyle = node.color;
                 ctx.shadowColor = glowColor;
@@ -693,7 +736,7 @@ const ReconTopologyView = ({
               </div>
             </div>
 
-            {selectedNode.originalItem && (
+            {selectedNode.originalItem && !selectedNode.isFindingNode && (
               <div className="border-t border-cyan-400/10 px-5 py-4">
                 <button onClick={handleEditClick} className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
                   <Edit2 className="h-4 w-4" />
