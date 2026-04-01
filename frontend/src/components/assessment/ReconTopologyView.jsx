@@ -213,17 +213,67 @@ const ReconTopologyView = ({
     nodes.push(rootNode);
     nodeIndex.set(rootId, rootNode);
 
+    // 第一遍：收集服务和端点信息，但不创建节点
+    const servicesMap = new Map(); // IP/hostname -> services[]
+    const endpointsMap = new Map(); // service -> endpoints[]
+    const technologiesMap = new Map(); // parent -> technologies[]
+
     data.forEach((item) => {
+      if (item.data_type === 'service') {
+        // 找到服务的宿主（IP或hostname）
+        const host = item.details?.host || item.name.split(':')[0];
+        if (!servicesMap.has(host)) {
+          servicesMap.set(host, []);
+        }
+        servicesMap.get(host).push(item);
+      } else if (item.data_type === 'endpoint') {
+        const service = item.details?.service || item.name.split('/')[0];
+        if (!endpointsMap.has(service)) {
+          endpointsMap.set(service, []);
+        }
+        endpointsMap.get(service).push(item);
+      } else if (item.data_type === 'technology') {
+        const parent = item.details?.technology_of || item.details?.host || item.details?.service;
+        if (parent) {
+          if (!technologiesMap.has(parent)) {
+            technologiesMap.set(parent, []);
+          }
+          technologiesMap.get(parent).push(item);
+        }
+      }
+    });
+
+    // 第二遍：创建节点（排除service, endpoint, technology）
+    data.forEach((item) => {
+      // 跳过服务、端点和技术节点，它们将作为属性附加到父节点
+      if (['service', 'endpoint', 'technology'].includes(item.data_type)) {
+        return;
+      }
+
       const nodeId = item.id.toString();
       const normalizedName = normalizeTargetService(item.name);
+
+      // 收集该节点的服务信息
+      const nodeServices = servicesMap.get(item.name) || [];
+      const nodeTechnologies = technologiesMap.get(item.name) || [];
+
+      // 收集所有相关的cards（包括服务和端点的cards）
       const matchingCards = cards.filter((card) => {
         const target = normalizeTargetService(card.target_service);
-        return target && (
-          target === normalizedName ||
-          normalizedName.includes(target) ||
-          target.includes(normalizedName)
-        );
+        if (!target) return false;
+
+        // 匹配节点本身
+        if (target === normalizedName || normalizedName.includes(target) || target.includes(normalizedName)) {
+          return true;
+        }
+
+        // 匹配节点的服务
+        return nodeServices.some(svc => {
+          const svcName = normalizeTargetService(svc.name);
+          return target === svcName || svcName.includes(target) || target.includes(svcName);
+        });
       });
+
       const highestSeverity = getHighestSeverity(matchingCards);
       const node = {
         id: nodeId,
@@ -237,12 +287,32 @@ const ReconTopologyView = ({
         highestSeverity,
         val: getNodeSize(item.data_type, highestSeverity),
         color: getNodeColor(item.data_type, item.name, highestSeverity),
+        // 附加服务、端点和技术信息
+        services: nodeServices,
+        technologies: nodeTechnologies,
+        serviceCount: nodeServices.length,
       };
+
+      // 为每个服务收集端点
+      node.services.forEach(svc => {
+        svc.endpoints = endpointsMap.get(svc.name) || [];
+      });
+
       nodes.push(node);
       nodeIndex.set(nodeId, node);
+
+      // 同时为服务名建立索引，方便后续查找
+      nodeServices.forEach(svc => {
+        nodeIndex.set(svc.id.toString(), node);
+      });
     });
 
     data.forEach((item) => {
+      // 跳过已经被收拢的节点类型
+      if (['service', 'endpoint', 'technology'].includes(item.data_type)) {
+        return;
+      }
+
       const sourceId = item.id.toString();
       let targetId = rootId;
 
@@ -252,22 +322,42 @@ const ReconTopologyView = ({
       } else if (item.data_type === 'ip_address') {
         const parentNetwork = data.find((d) => d.data_type === 'network' && item.name.startsWith(d.name.split('.')[0]));
         if (parentNetwork) targetId = parentNetwork.id.toString();
-      } else if (item.data_type === 'service') {
-        const parentHost = data.find((d) => (d.data_type === 'ip_address' || d.data_type === 'hostname') &&
-          (item.details?.host === d.name || item.name.includes(d.name)));
-        if (parentHost) targetId = parentHost.id.toString();
       } else if (item.data_type === 'hostname') {
+        // 策略1: details.ip 直接绑定
         if (item.details?.ip) {
           const parentIp = data.find((d) => d.data_type === 'ip_address' && d.name === item.details.ip);
-          if (parentIp) targetId = parentIp.id.toString();
+          if (parentIp) { targetId = parentIp.id.toString(); }
         }
-      } else if (item.data_type === 'endpoint') {
-        const parentService = data.find((d) => d.data_type === 'service' && (item.details?.service === d.name || item.name.includes(d.name)));
-        if (parentService) targetId = parentService.id.toString();
-      } else if (item.data_type === 'technology') {
-        const parentAsset = data.find((d) => ['service', 'hostname', 'endpoint'].includes(d.data_type) &&
-          (item.details?.service === d.name || item.details?.host === d.name || item.details?.technology_of === d.name));
-        if (parentAsset) targetId = parentAsset.id.toString();
+        // 策略2: 通过 service 记录的 details.hostname 反向查找对应 IP
+        if (targetId === rootId) {
+          const matchedService = data.find((d) =>
+            d.data_type === 'service' &&
+            d.details?.hostname &&
+            d.details.hostname.toLowerCase() === item.name.toLowerCase()
+          );
+          if (matchedService?.details?.host) {
+            const parentIp = data.find((d) =>
+              d.data_type === 'ip_address' && d.name === matchedService.details.host
+            );
+            if (parentIp) targetId = parentIp.id.toString();
+          }
+        }
+        // 策略3: hostname 名称包含在某个 IP 节点的服务列表中（已收拢的服务）
+        if (targetId === rootId) {
+          const hostLower = item.name.toLowerCase();
+          const matchedIpNode = nodes.find((n) =>
+            n.data_type === 'ip_address' &&
+            n.services?.some((svc) => svc.details?.hostname?.toLowerCase() === hostLower)
+          );
+          if (matchedIpNode) targetId = matchedIpNode.id;
+        }
+        // 策略4: 对于域名形式的hostname (如 DC01.xiaorang.lab)，连接到对应的domain节点
+        if (targetId === rootId) {
+          const parentDomain = data.find((d) =>
+            d.data_type === 'domain' && item.name.toLowerCase().endsWith(d.name.toLowerCase())
+          );
+          if (parentDomain) targetId = parentDomain.id.toString();
+        }
       }
 
       const isRootLink = targetId === rootId;
@@ -275,11 +365,7 @@ const ReconTopologyView = ({
         source: targetId,
         target: sourceId,
         isRootLink,
-        distance: isRootLink
-          ? 260
-          : ['subdomain', 'endpoint', 'technology'].includes(item.data_type)
-            ? 150
-            : 185,
+        distance: isRootLink ? 260 : 185,
         color: nodeIndex.get(sourceId)?.highestSeverity
           ? `${getNodeColor(item.data_type, item.name, nodeIndex.get(sourceId)?.highestSeverity)}88`
           : '#1e293b',
@@ -960,6 +1046,63 @@ const ReconTopologyView = ({
                   <div className="mt-2 text-lg font-semibold text-slate-200">{selectedNode.infoCount || 0}</div>
                 </div>
               </div>
+
+              {/* 服务信息展示 */}
+              {selectedNode.services && selectedNode.services.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    <Activity className="h-4 w-4 text-amber-300" />
+                    Services ({selectedNode.serviceCount})
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {selectedNode.services.map((svc) => (
+                      <div key={svc.id} className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-amber-200">{svc.name}</div>
+                            {svc.details?.port && (
+                              <div className="mt-1 text-xs text-slate-400">Port: {svc.details.port}</div>
+                            )}
+                            {svc.details?.protocol && (
+                              <div className="text-xs text-slate-400">Protocol: {svc.details.protocol}</div>
+                            )}
+                          </div>
+                          {svc.highestSeverity && (
+                            <span className="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-950" style={{ backgroundColor: SEVERITY_COLORS[svc.highestSeverity] || '#94a3b8' }}>
+                              {svc.highestSeverity}
+                            </span>
+                          )}
+                        </div>
+                        {svc.endpoints && svc.endpoints.length > 0 && (
+                          <div className="mt-2 space-y-1 border-t border-amber-400/10 pt-2">
+                            <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Endpoints</div>
+                            {svc.endpoints.map((ep) => (
+                              <div key={ep.id} className="text-xs text-slate-300">• {ep.name}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 技术栈展示 */}
+              {selectedNode.technologies && selectedNode.technologies.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    <Activity className="h-4 w-4 text-yellow-300" />
+                    Technologies
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedNode.technologies.map((tech) => (
+                      <span key={tech.id} className="rounded-full border border-yellow-400/20 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-200">
+                        {tech.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-slate-500">
