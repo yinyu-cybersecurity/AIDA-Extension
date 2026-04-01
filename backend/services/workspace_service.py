@@ -189,29 +189,24 @@ class WorkspaceService:
     async def validate_workspace_in_container(
         self,
         container_path: str,
-        container_name: str
+        container_name: str,
+        owner_uid: int = 1000
     ) -> bool:
         """
-        Check if workspace folder exists inside the Exegol container.
-
-        This is the preferred method when backend runs in Docker, as it
-        cannot directly access host filesystem paths.
-
-        Args:
-            container_path: Path inside the container (e.g., "/workspace/assessment-1")
-            container_name: Name of the Exegol container
-
-        Returns:
-            True if path exists and is a directory inside the container
+        Check if workspace folder exists, has the specific subdirectories, and is owned by the correct user.
         """
+        # We check if the root directory exists, is owned by owner_uid, and if the 'recon' subdir exists 
+        # as a heuristic that the workspace was properly initialized.
+        check_cmd = f"test -d {shlex.quote(container_path)} && test -d {shlex.quote(container_path + '/recon')} && [ $(stat -c '%u' {shlex.quote(container_path)}) -eq {owner_uid} ]"
+        
         result = await self._run_command([
-            "docker", "exec", container_name, "test", "-d", container_path
+            "docker", "exec", container_name, "bash", "-c", check_cmd
         ])
 
         exists = result["returncode"] == 0
 
         logger.debug(
-            "Validated workspace existence in container",
+            "Validated workspace existence and permissions in container",
             container_name=container_name,
             container_path=container_path,
             exists=exists
@@ -246,6 +241,7 @@ class WorkspaceService:
         exists = await self.validate_workspace_in_container(
             container_path=paths[0],
             container_name=container_name,
+            owner_uid=owner_uid,
         )
         if exists:
             return False

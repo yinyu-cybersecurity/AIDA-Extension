@@ -118,7 +118,8 @@ def get_tool_definitions() -> List[Tool]:
                         "description": "Maximum number of assessments to return",
                         "default": 50
                     }
-                }
+                },
+                "required": []
             }
         ),
         Tool(
@@ -126,7 +127,8 @@ def get_tool_definitions() -> List[Tool]:
             description="List available pentesting containers with their status. No assessment needs to be loaded.",
             inputSchema={
                 "type": "object",
-                "properties": {}
+                "properties": {},
+                "required": []
             }
         ),
         Tool(
@@ -352,7 +354,8 @@ def get_tool_definitions() -> List[Tool]:
                         },
                         "description": "Array of recon data entries to add (batch mode)"
                     }
-                }
+                },
+                "required": []
                 # Note: No required fields - validation happens in handler
                 # Handler will check: must have either (data_type AND name) OR entries
             }

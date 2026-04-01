@@ -19,7 +19,9 @@ PREPROMPT_FILE = Path(__file__).resolve().parents[2] / 'Docs' / 'PrePrompt.txt'
 
 class AIAgentService:
     # 扩大对话上下文窗口，允许 AI 能够记住更多交互历史
-    MAX_CONTEXT_MESSAGES = 150
+    # Claude Sonnet 4.6 上下文窗口为 200K token，300 条消息（约 150 次工具调用）
+    # 在正常渗透会话中几乎不会触碰 token 上限，保守翻倍以覆盖完整攻击链。
+    MAX_CONTEXT_MESSAGES = 300
 
     def __init__(self):
         self.client = AsyncOpenAI(
@@ -162,25 +164,81 @@ class AIAgentService:
                 while payloads and payloads[0].get('role') == 'tool':
                     payloads.pop(0)
 
-            # 清理末尾孤立的 assistant tool_calls 消息：
-            # 当用户在工具执行中途插入新消息时，上下文末尾可能留有
-            # assistant(tool_calls=[...]) 但没有对应 tool 响应，导致 400。
-            # 找到最后一条 assistant 消息，若它有 tool_calls 且其后没有 tool 消息，则移除整个悬空尾巴。
-            last_assistant_idx = None
-            for i in range(len(payloads) - 1, -1, -1):
-                if payloads[i].get('role') == 'assistant':
-                    last_assistant_idx = i
-                    break
-            if last_assistant_idx is not None:
-                last_assistant = payloads[last_assistant_idx]
-                if last_assistant.get('tool_calls'):
-                    # Check if there's at least one tool response after it
-                    has_tool_response = any(
-                        p.get('role') == 'tool'
-                        for p in payloads[last_assistant_idx + 1:]
-                    )
-                    if not has_tool_response:
-                        payloads = payloads[:last_assistant_idx]
+            # ---------------------------------------------------------------
+            # 修复孤立的 tool_calls / tool 响应
+            # ---------------------------------------------------------------
+            # 根因：
+            #   Claude/兼容接口要求每条含 tool_calls 的 assistant 消息，其后必须紧跟
+            #   与每一个 call_id 一一对应的 tool 响应消息（不能有遗漏，也不能被其他角色
+            #   的消息隔断）。以下两种情况会导致 HTTP 400：
+            #
+            #   场景A：用户在工具执行中途发送新消息（WebSocket 中断当前 agent loop），
+            #          导致部分 tool_call_id 的响应永远没有被写入数据库。
+            #          历史里的序列变成：
+            #            assistant(tool_calls=[A,B]) → tool(A) → user(打断) → assistant(新轮次)
+            #          tool_call_id=B 完全没有响应。
+            #
+            #   场景B（上一版修复的 bug）：旧逻辑在判断"响应 id 集合"时扫描了全部后续
+            #          tool 消息（payloads[i+1:]），导致后续不相关轮次里恰好也叫 tool_2
+            #          的 id 被误认为是当前 assistant 的响应。（Claude 每轮从 tool_1 重新
+            #          计数，不同轮次的 tool_2 语义不同。）
+            #
+            # 修复策略：
+            #   对每一条含 tool_calls 的 assistant 消息，只收集"紧随其后、连续出现的
+            #   tool 消息"作为本轮响应（遇到非 tool 消息立即停止收集）。
+            #   - 若有缺失的 call_id：
+            #       · 末尾（后面没有其他 assistant）→ 截断整个 assistant 及其尾部
+            #       · 中间（后面还有 assistant）    → 插入 error 占位 tool 消息
+            # ---------------------------------------------------------------
+            i = 0
+            while i < len(payloads):
+                p = payloads[i]
+                if p.get('role') == 'assistant' and p.get('tool_calls'):
+                    expected_ids = {
+                        tc['id'] for tc in p['tool_calls']
+                        if isinstance(tc, dict) and 'id' in tc
+                    }
+                    # 只收集紧随本 assistant 之后、连续出现的 tool 消息（跨角色即停）
+                    adjacent_tool_ids = set()
+                    j = i + 1
+                    while j < len(payloads) and payloads[j].get('role') == 'tool':
+                        tid = payloads[j].get('tool_call_id')
+                        if tid:
+                            adjacent_tool_ids.add(tid)
+                        j += 1
+
+                    missing_ids = expected_ids - adjacent_tool_ids
+                    if missing_ids:
+                        # 判断后面是否还有其他 assistant 消息
+                        has_later_assistant = any(
+                            q.get('role') == 'assistant'
+                            for q in payloads[i + 1:]
+                        )
+                        if has_later_assistant:
+                            # 中间孤立：在紧随的 tool 消息之后插入占位符
+                            insert_pos = j  # j 已指向第一个非 tool 位置
+                            for missing_id in missing_ids:
+                                tool_name = next(
+                                    (tc.get('function', {}).get('name', 'unknown')
+                                     for tc in p['tool_calls']
+                                     if isinstance(tc, dict) and tc.get('id') == missing_id),
+                                    'unknown'
+                                )
+                                placeholder = {
+                                    'role': 'tool',
+                                    'tool_call_id': missing_id,
+                                    'name': tool_name,
+                                    'content': (
+                                        f'Tool {tool_name} was interrupted before producing output.'
+                                    ),
+                                }
+                                payloads.insert(insert_pos, placeholder)
+                                insert_pos += 1
+                        else:
+                            # 末尾孤立：截断 assistant 及其后所有消息
+                            payloads = payloads[:i]
+                            break
+                i += 1
 
             return payloads
         finally:
@@ -211,8 +269,12 @@ class AIAgentService:
                 content = res.get('stdout') or ''
                 if content:
                     parts.append(f"### {fpath}\n\n{content}")
+                else:
+                    logger.warning(f'Context document is empty or unreadable: {fpath}')
             if parts:
                 return "## **Context Documents (read-only reference)**\n\n" + "\n\n---\n\n".join(parts)
+            else:
+                logger.warning(f'No context documents could be loaded from {context_dir} in container {container}')
         except Exception as e:
             logger.warning(f'Failed to load context documents: {e}')
         return ''
