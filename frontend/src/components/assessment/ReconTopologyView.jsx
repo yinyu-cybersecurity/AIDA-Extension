@@ -3,6 +3,54 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { X, Edit2, Shield, Activity } from '../icons/index';
 import UnifiedModal from '../common/UnifiedModal';
 import apiClient from '../../services/api';
+import attackPathService from '../../services/attackPathService';
+
+// 攻击向量类型定义
+const ATTACK_VECTORS = {
+  credential_reuse: {
+    label: 'Credential Reuse',
+    color: '#f59e0b',
+    icon: '🔑',
+    description: '凭据复用攻击'
+  },
+  lateral_movement: {
+    label: 'Lateral Movement',
+    color: '#8b5cf6',
+    icon: '↔️',
+    description: '横向移动'
+  },
+  privilege_escalation: {
+    label: 'Privilege Escalation',
+    color: '#ef4444',
+    icon: '⬆️',
+    description: '权限提升'
+  },
+  data_exfiltration: {
+    label: 'Data Exfiltration',
+    color: '#06b6d4',
+    icon: '📤',
+    description: '数据外泄'
+  },
+  remote_code_execution: {
+    label: 'Remote Code Execution',
+    color: '#dc2626',
+    icon: '💥',
+    description: '远程代码执行'
+  },
+  network_pivot: {
+    label: 'Network Pivot',
+    color: '#7c3aed',
+    icon: '🔄',
+    description: '网络跳板'
+  },
+  exploitation: {
+    label: 'Exploitation',
+    color: '#f43f5e',
+    icon: '⚡',
+    description: '漏洞利用'
+  }
+};
+
 
 const isInternalIP = (ip) => {
   if (!ip) return false;
@@ -108,6 +156,14 @@ const ReconTopologyView = ({
   const fgRef = useRef(null);
   const graphPaneRef = useRef(null);
   const viewportFrameRef = useRef(null);
+
+  // 攻击路径相关状态
+  const [attackPaths, setAttackPaths] = useState([]);
+  const [isLinkingMode, setIsLinkingMode] = useState(false);
+  const [linkSourceNode, setLinkSourceNode] = useState(null);
+  const [showVectorModal, setShowVectorModal] = useState(false);
+  const [selectedVector, setSelectedVector] = useState('credential_reuse');
+  const [pendingLink, setPendingLink] = useState(null);
 
   const topologyData = useMemo(() => {
     const nodes = [];
@@ -293,16 +349,54 @@ const ReconTopologyView = ({
     return { nodes, links };
   }, [assessmentId, assessmentName, cards, data]);
 
+  // 合并拓扑数据和攻击路径
+  const graphData = useMemo(() => {
+    const { nodes, links } = topologyData;
+
+    // 添加攻击路径作为额外的链接
+    const attackPathLinks = attackPaths.map(path => {
+      const sourceId = path.source_type === 'assessment'
+        ? `assessment-${assessmentId}`
+        : path.source_type === 'finding'
+        ? `finding-${path.source_id}`
+        : path.source_id;
+
+      const targetId = path.target_type === 'assessment'
+        ? `assessment-${assessmentId}`
+        : path.target_type === 'finding'
+        ? `finding-${path.target_id}`
+        : path.target_id;
+
+      return {
+        source: sourceId,
+        target: targetId,
+        isAttackPath: true,
+        attackPathId: path.id,
+        vectorType: path.vector_type,
+        status: path.status,
+        confidence: path.confidence,
+        distance: 150,
+        color: ATTACK_VECTORS[path.vector_type]?.color || '#ef4444'
+      };
+    });
+
+    return {
+      nodes,
+      links: [...links, ...attackPathLinks]
+    };
+  }, [topologyData, attackPaths, assessmentId]);
+
   const topologyStats = useMemo(() => {
     const findings = cards.filter((card) => card.card_type === 'finding');
     return {
       nodes: topologyData.nodes.length,
       links: topologyData.links.length,
+      attackPaths: attackPaths.length,
       findings: findings.length,
       critical: findings.filter((card) => card.severity === 'CRITICAL').length,
       high: findings.filter((card) => card.severity === 'HIGH').length,
     };
-  }, [cards, topologyData]);
+  }, [cards, topologyData, attackPaths]);
 
   useEffect(() => {
     const graphPane = graphPaneRef.current;
@@ -389,15 +483,16 @@ const ReconTopologyView = ({
     const graph = fgRef.current;
     if (!graph || graphSize.width === 0 || graphSize.height === 0) return;
 
+    // 降低斥力强度，使拖拽后节点更稳定
     const chargeForce = graph.d3Force('charge');
     if (chargeForce?.strength) {
       chargeForce.strength((node) => {
-        if (node.isRoot) return -2200;
-        if (node.isFindingNode) return -450;
-        if (node.highestSeverity === 'CRITICAL') return -1100;
-        if (node.highestSeverity) return -920;
-        if (['service', 'endpoint', 'technology'].includes(node.data_type)) return -760;
-        return -560;
+        if (node.isRoot) return -800;  // 从-2200降低
+        if (node.isFindingNode) return -200;  // 从-450降低
+        if (node.highestSeverity === 'CRITICAL') return -500;  // 从-1100降低
+        if (node.highestSeverity) return -400;  // 从-920降低
+        if (['service', 'endpoint', 'technology'].includes(node.data_type)) return -350;  // 从-760降低
+        return -280;  // 从-560降低
       });
       if (chargeForce.distanceMax) {
         chargeForce.distanceMax(1600);
@@ -413,6 +508,46 @@ const ReconTopologyView = ({
       if (linkForce.iterations) {
         linkForce.iterations(2);
       }
+    }
+
+    // 添加碰撞检测力，防止节点重叠
+    const collisionForce = graph.d3Force('collide');
+    if (!collisionForce) {
+      // 需要导入d3-force，但react-force-graph-2d已经包含了d3
+      // 直接使用graph的d3Force方法添加
+      try {
+        graph.d3Force('collide', graph.d3Force('charge').constructor.prototype.constructor
+          ? null  // 如果无法访问d3.forceCollide，跳过
+          : null
+        );
+      } catch (e) {
+        // 静默失败，碰撞检测是增强功能
+      }
+    }
+    if (collisionForce?.radius) {
+      collisionForce.radius(getCollisionRadius).strength(0.8);
+    }
+
+    // 添加分层布局力，使不同类型节点在垂直方向分层
+    const layerForce = graph.d3Force('y');
+    if (!layerForce) {
+      try {
+        graph.d3Force('y', null);  // 尝试添加y轴力
+      } catch (e) {
+        // 静默失败
+      }
+    }
+    if (layerForce?.y) {
+      layerForce.y((node) => {
+        if (node.isRoot) return 0;
+        if (node.data_type === 'domain' || node.data_type === 'network') return -150;
+        if (node.data_type === 'subdomain' || node.data_type === 'hostname') return -50;
+        if (node.data_type === 'ip_address') return 0;
+        if (node.data_type === 'service') return 100;
+        if (node.data_type === 'endpoint' || node.data_type === 'technology') return 180;
+        if (node.isFindingNode) return 280;
+        return 0;
+      }).strength(0.15);  // 较弱的约束力，不完全固定
     }
 
     if (typeof graph.d3VelocityDecay === 'function') {
@@ -443,9 +578,87 @@ const ReconTopologyView = ({
   }, [fitGraph, focusNode, graphSize.height, graphSize.width, isActive, scheduleViewportUpdate, selectedNode, topologyData]);
 
   const handleNodeClick = useCallback((node) => {
-    setSelectedNode(node);
-    focusNode(node);
-  }, [focusNode]);
+    if (isLinkingMode) {
+      // 连线模式：选择目标节点
+      if (!linkSourceNode) {
+        // 选择源节点
+        setLinkSourceNode(node);
+      } else if (linkSourceNode.id !== node.id) {
+        // 选择目标节点，显示向量选择模态框
+        setPendingLink({ source: linkSourceNode, target: node });
+        setShowVectorModal(true);
+      }
+    } else {
+      // 正常模式：显示节点详情
+      setSelectedNode(node);
+      focusNode(node);
+    }
+  }, [focusNode, isLinkingMode, linkSourceNode]);
+
+  // 加载攻击路径
+  useEffect(() => {
+    if (!assessmentId) return;
+    const loadAttackPaths = async () => {
+      try {
+        const paths = await attackPathService.getAttackPaths(assessmentId);
+        setAttackPaths(paths);
+      } catch (error) {
+        console.error('Failed to load attack paths:', error);
+      }
+    };
+    loadAttackPaths();
+  }, [assessmentId]);
+
+  // 切换连线模式
+  const toggleLinkingMode = () => {
+    setIsLinkingMode(!isLinkingMode);
+    setLinkSourceNode(null);
+    setPendingLink(null);
+  };
+
+  // 创建攻击路径
+  const handleCreateAttackPath = async () => {
+    if (!pendingLink) return;
+
+    try {
+      const pathData = {
+        source_type: pendingLink.source.data_type === 'target' ? 'assessment' :
+                     pendingLink.source.isFindingNode ? 'finding' : 'recon_asset',
+        source_id: pendingLink.source.isFindingNode
+          ? pendingLink.source.details.id.toString()
+          : pendingLink.source.id.toString(),
+        target_type: pendingLink.target.data_type === 'target' ? 'assessment' :
+                     pendingLink.target.isFindingNode ? 'finding' : 'recon_asset',
+        target_id: pendingLink.target.isFindingNode
+          ? pendingLink.target.details.id.toString()
+          : pendingLink.target.id.toString(),
+        vector_type: selectedVector,
+        confidence: 1.0,
+        status: 'manual',
+        created_by: 'user'
+      };
+
+      const newPath = await attackPathService.createAttackPath(assessmentId, pathData);
+      setAttackPaths([...attackPaths, newPath]);
+      setShowVectorModal(false);
+      setPendingLink(null);
+      setLinkSourceNode(null);
+    } catch (error) {
+      console.error('Failed to create attack path:', error);
+      alert('Failed to create attack path');
+    }
+  };
+
+  // 删除攻击路径
+  const handleDeleteAttackPath = async (pathId) => {
+    try {
+      await attackPathService.deleteAttackPath(assessmentId, pathId);
+      setAttackPaths(attackPaths.filter(p => p.id !== pathId));
+    } catch (error) {
+      console.error('Failed to delete attack path:', error);
+      alert('Failed to delete attack path');
+    }
+  };
 
   const handleEditClick = () => {
     if (!selectedNode || !selectedNode.originalItem) return;
@@ -487,10 +700,44 @@ const ReconTopologyView = ({
       <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
       <div className="relative border-b border-cyan-400/10 bg-slate-950/70 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.35em] text-cyan-300/80">Operator View</div>
             <h3 className="mt-2 text-xl font-semibold text-slate-50">{assessmentName} topology console</h3>
             <p className="mt-1 text-sm text-slate-400">Calibrated recon map with responsive viewport fitting and risk-aware graph spacing.</p>
+
+            {/* 攻击路径控制按钮 */}
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={toggleLinkingMode}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isLinkingMode
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
+                    : 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:bg-slate-700/50'
+                }`}
+              >
+                {isLinkingMode ? '✓ 连线模式' : '🔗 标注攻击路径'}
+              </button>
+              {isLinkingMode && linkSourceNode && (
+                <div className="flex items-center gap-2 text-xs text-purple-300">
+                  <span>源节点: {linkSourceNode.name}</span>
+                  <button
+                    onClick={() => {
+                      setLinkSourceNode(null);
+                      setPendingLink(null);
+                    }}
+                    className="text-slate-400 hover:text-slate-200"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {topologyStats.attackPaths > 0 && (
+                <div className="flex items-center gap-1.5 rounded-lg bg-purple-500/10 px-2.5 py-1 text-xs text-purple-300 border border-purple-400/20">
+                  <span>⚡</span>
+                  <span>{topologyStats.attackPaths} 条攻击路径</span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-2xl border border-cyan-400/10 bg-slate-950/70 px-4 py-3">
@@ -543,14 +790,31 @@ const ReconTopologyView = ({
               ref={fgRef}
               width={graphSize.width}
               height={graphSize.height}
-              graphData={topologyData}
+              graphData={graphData}
               backgroundColor="#020617"
               linkColor={(link) => link.color || '#1e293b'}
-              linkWidth={(link) => link.isFindingLink ? 3 : (link.color && link.color !== '#1e293b' ? 2.4 : 1.15)}
-              linkDirectionalParticles={(link) => link.isFindingLink ? 4 : (link.color && link.color !== '#1e293b' ? 2 : 0)}
+              linkWidth={(link) => {
+                if (link.isAttackPath) return 3;
+                if (link.isFindingLink) return 3;
+                return link.color && link.color !== '#1e293b' ? 2.4 : 1.15;
+              }}
+              linkDirectionalArrowLength={(link) => link.isAttackPath ? 8 : 0}
+              linkDirectionalArrowRelPos={1}
+              linkCurvature={(link) => link.isAttackPath ? 0.2 : 0}
+              linkDirectionalParticles={(link) => {
+                if (link.isAttackPath) return 0;
+                if (link.isFindingLink) return 4;
+                return link.color && link.color !== '#1e293b' ? 2 : 0;
+              }}
               linkDirectionalParticleColor={(link) => link.color || '#22d3ee'}
               linkDirectionalParticleWidth={(link) => link.isFindingLink ? 3 : 2}
+              linkLineDash={(link) => link.isAttackPath && link.status === 'suggested' ? [5, 5] : null}
               onNodeClick={handleNodeClick}
+              onNodeDragEnd={(node) => {
+                // 固定拖拽后的节点位置
+                node.fx = node.x;
+                node.fy = node.y;
+              }}
               cooldownTicks={160}
               warmupTicks={32}
               nodeRelSize={1}
@@ -734,6 +998,62 @@ const ReconTopologyView = ({
                   )}
                 </div>
               </div>
+
+              {/* 攻击路径显示 */}
+              {(() => {
+                const nodeId = selectedNode.id;
+                const relatedPaths = attackPaths.filter(
+                  p => {
+                    const sourceId = p.source_type === 'assessment' ? `assessment-${assessmentId}` :
+                                    p.source_type === 'finding' ? `finding-${p.source_id}` : p.source_id;
+                    const targetId = p.target_type === 'assessment' ? `assessment-${assessmentId}` :
+                                    p.target_type === 'finding' ? `finding-${p.target_id}` : p.target_id;
+                    return sourceId === nodeId || targetId === nodeId;
+                  }
+                );
+
+                if (relatedPaths.length === 0) return null;
+
+                return (
+                  <div>
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                      <span className="text-purple-400">⚡</span>
+                      Attack Paths
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {relatedPaths.map((path) => {
+                        const vector = ATTACK_VECTORS[path.vector_type];
+                        const sourceId = path.source_type === 'assessment' ? `assessment-${assessmentId}` :
+                                        path.source_type === 'finding' ? `finding-${path.source_id}` : path.source_id;
+                        const isSource = sourceId === nodeId;
+
+                        return (
+                          <div key={path.id} className="rounded-lg border border-purple-400/20 bg-purple-500/5 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span>{vector?.icon || '⚡'}</span>
+                                  <span className="font-medium text-purple-300">{vector?.label || path.vector_type}</span>
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">
+                                  {isSource ? '→ 目标' : '← 来源'}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteAttackPath(path.id)}
+                                className="rounded p-1 text-slate-500 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                title="删除攻击路径"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {selectedNode.originalItem && !selectedNode.isFindingNode && (
@@ -757,6 +1077,52 @@ const ReconTopologyView = ({
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">Details (JSON)</label>
             <textarea value={typeof editFormData.details === 'string' ? editFormData.details : JSON.stringify(editFormData.details, null, 2)} onChange={(e) => { const val = e.target.value; try { setEditFormData({ ...editFormData, details: JSON.parse(val) }); } catch { setEditFormData({ ...editFormData, details: val }); } }} rows={6} className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 font-mono text-sm text-neutral-900 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" />
+          </div>
+        </div>
+      </UnifiedModal>
+
+      {/* 攻击向量选择模态框 */}
+      <UnifiedModal
+        isOpen={showVectorModal}
+        onClose={() => {
+          setShowVectorModal(false);
+          setPendingLink(null);
+        }}
+        title="选择攻击向量"
+        onSubmit={handleCreateAttackPath}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-slate-400 mb-4">
+              从 <span className="font-semibold text-cyan-300">{pendingLink?.source.name}</span> 到{' '}
+              <span className="font-semibold text-cyan-300">{pendingLink?.target.name}</span>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            {Object.entries(ATTACK_VECTORS).map(([key, vector]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedVector(key)}
+                className={`flex items-center gap-3 rounded-lg border p-4 text-left transition-all ${
+                  selectedVector === key
+                    ? 'border-purple-400/50 bg-purple-500/10'
+                    : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600/50 hover:bg-slate-800/50'
+                }`}
+              >
+                <span className="text-2xl">{vector.icon}</span>
+                <div className="flex-1">
+                  <div className="font-medium text-slate-200">{vector.label}</div>
+                  <div className="text-xs text-slate-400">{vector.description}</div>
+                </div>
+                {selectedVector === key && (
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500">
+                    <span className="text-xs text-white">✓</span>
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </UnifiedModal>

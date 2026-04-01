@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import init_db
-from api import assessments, cards, recon, sections, containers, folders, search, system, credentials, websocket, workspace, pending_commands, context_documents, source_code
+from api import assessments, cards, recon, sections, containers, folders, search, system, credentials, websocket, workspace, pending_commands, context_documents, source_code, attack_paths
 from api import commands
 from utils.logger import setup_logging, get_logger
 from middleware.logging_middleware import LoggingMiddleware
@@ -49,6 +49,7 @@ app.add_middleware(
 app.include_router(assessments.router, prefix=settings.API_V1_PREFIX)
 app.include_router(cards.router, prefix=settings.API_V1_PREFIX)
 app.include_router(recon.router, prefix=settings.API_V1_PREFIX)
+app.include_router(attack_paths.router, prefix=settings.API_V1_PREFIX)
 app.include_router(commands.router, prefix=settings.API_V1_PREFIX)
 app.include_router(commands.global_router, prefix=settings.API_V1_PREFIX)  # Global commands view
 app.include_router(credentials.router, prefix=settings.API_V1_PREFIX)

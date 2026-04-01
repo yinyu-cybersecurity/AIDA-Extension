@@ -12,6 +12,7 @@ from .platform_settings import PlatformSettings
 from .credential import Credential
 from .pending_command import PendingCommand
 from .assessment_ai_message import AssessmentAIMessage
+from .attack_path import AttackPath
 
 __all__ = [
     "Assessment",
@@ -24,6 +25,7 @@ __all__ = [
     "PlatformSettings",
     "Credential",
     "PendingCommand",
-    "AssessmentAIMessage"
+    "AssessmentAIMessage",
+    "AttackPath"
 ]
 

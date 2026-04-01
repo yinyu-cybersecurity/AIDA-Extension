@@ -30,6 +30,11 @@ class EventType(str, Enum):
     RECON_UPDATED = "recon_updated"
     RECON_DELETED = "recon_deleted"
 
+    # Attack path events
+    ATTACK_PATH_ADDED = "attack_path_added"
+    ATTACK_PATH_UPDATED = "attack_path_updated"
+    ATTACK_PATH_DELETED = "attack_path_deleted"
+
     # Section events (phases)
     SECTION_UPDATED = "section_updated"
 
@@ -256,3 +261,34 @@ def event_error(message: str, details: dict = None) -> dict:
     if details:
         data["details"] = details
     return create_event(EventType.ERROR, data)
+
+
+def event_attack_path_added(assessment_id: int, attack_path) -> dict:
+    """Create attack_path_added event"""
+    from schemas.attack_path import AttackPathResponse
+    path_data = AttackPathResponse.model_validate(attack_path).model_dump(mode='json')
+    return create_event(
+        EventType.ATTACK_PATH_ADDED,
+        {"attack_path": path_data},
+        assessment_id=assessment_id
+    )
+
+
+def event_attack_path_updated(assessment_id: int, attack_path) -> dict:
+    """Create attack_path_updated event"""
+    from schemas.attack_path import AttackPathResponse
+    path_data = AttackPathResponse.model_validate(attack_path).model_dump(mode='json')
+    return create_event(
+        EventType.ATTACK_PATH_UPDATED,
+        {"attack_path": path_data},
+        assessment_id=assessment_id
+    )
+
+
+def event_attack_path_deleted(assessment_id: int, path_id: int) -> dict:
+    """Create attack_path_deleted event"""
+    return create_event(
+        EventType.ATTACK_PATH_DELETED,
+        {"path_id": path_id},
+        assessment_id=assessment_id
+    )

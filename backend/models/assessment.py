@@ -50,4 +50,5 @@ class Assessment(Base):
     credentials_list = relationship("Credential", back_populates="assessment", cascade="all, delete-orphan")
     pending_commands = relationship("PendingCommand", back_populates="assessment", cascade="all, delete-orphan")
     ai_messages = relationship("AssessmentAIMessage", back_populates="assessment", cascade="all, delete-orphan", order_by="AssessmentAIMessage.sequence_number")
+    attack_paths = relationship("AttackPath", back_populates="assessment", cascade="all, delete-orphan")
 
